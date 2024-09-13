@@ -148,6 +148,7 @@ h1 {
   justify-content: center;
   align-items: center;
   margin-bottom: auto; /* Space between button and bottom text */
+  margin-top: -20vw; 
 }
 
 /* Button styling */

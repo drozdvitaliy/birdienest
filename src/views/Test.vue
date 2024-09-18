@@ -93,7 +93,7 @@ export default {
 
 .question {
   text-align: center;
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   font-weight: 700;
   margin-top: 10px;
   margin-bottom: 20px;

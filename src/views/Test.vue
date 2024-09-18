@@ -78,7 +78,7 @@ export default {
 
 .progress-bar-container {
   width: 100%;
-  height: 15px;
+  height: 10px;
   background-color: #c1c1c1;
   border-radius: 5px;
   margin-bottom: 0px;
@@ -95,6 +95,7 @@ export default {
   text-align: center;
   font-size: 1.6rem;
   font-weight: 700;
+  margin-top: 10px;
   margin-bottom: 20px;
 }
 
@@ -144,7 +145,7 @@ export default {
   border: none;
   border-radius: 20px;
   cursor: pointer;
-  width: 17vh; /* Set a fixed width */
+  width: 19vh; /* Set a fixed width */
   height: 6vh; /* Set a fixed height */
   font-size: 1.3rem;
   font-weight: 700;

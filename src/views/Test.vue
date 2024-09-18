@@ -71,7 +71,6 @@ export default {
   justify-content: space-between;
   height: 100vh;
   padding: 20px;
-  /* background: linear-gradient(to bottom, #5d7fc1, #96cdf7); */
   color: white;
   font-family: Arial, sans-serif;
 }
@@ -91,12 +90,24 @@ export default {
   transition: width 1s linear;
 }
 
+.content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  max-width: 500px;
+}
+
 .question {
   text-align: center;
   font-size: 1.3rem;
   font-weight: 700;
   margin-top: 10px;
   margin-bottom: 20px;
+  height: 30%; /* Fix height for the question block */
+  overflow: auto; /* Allows long questions to scroll */
 }
 
 .options {
@@ -104,7 +115,8 @@ export default {
   flex-direction: column;
   width: 100%;
   max-width: 500px;
-  margin-bottom: 0px;
+  justify-content: flex-start;
+  margin-bottom: 20px;
 }
 
 .option-button {
@@ -136,6 +148,7 @@ export default {
   width: 100%;
   max-width: 500px;
   margin-bottom: 7vh;
+  flex-shrink: 0; /* Prevent footer from shrinking */
 }
 
 .hint-button, .next-button {
@@ -150,20 +163,6 @@ export default {
   font-size: 1.3rem;
   font-weight: 700;
 }
-
-.hint-button {
-  background-color: #cb6ce6;
-}
-
-.hint-button:hover {
-  background-color: #cb6ce6;
-}
-
-.next-button {
-  background-color: #cb6ce6;
-}
-
-.next-button:hover {
-  background-color: #cb6ce6;
-}
 </style>
+
+

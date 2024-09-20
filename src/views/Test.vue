@@ -295,9 +295,9 @@ export default {
   transition: background-color 0.3s ease;
 }
 
-.option-button:hover {
+/* .option-button:hover {
   background-color: #ffbd59;
-}
+} */
 
 .correct-option {
   background-color: green !important;

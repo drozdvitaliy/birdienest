@@ -100,7 +100,7 @@ export default {
             hint: "Остановитесь и пропустите пешеходов на переходе.",
             correctOption: 1,
           });
-        }, 1); // Simulate a 1-second delay
+        }, 1000); // Simulate a 1-second delay
       });
 
       this.questionText = simulatedApiResponse.questionText;
@@ -311,7 +311,8 @@ export default {
 
 .feedback {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 0px;
+  margin-bottom: -7vh;
 }
 
 .correct-feedback {

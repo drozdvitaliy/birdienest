@@ -15,11 +15,14 @@
           v-for="(option, index) in options"
           :key="index"
           class="option-button"
-          :class="[selectedOption === index && isAnswerCorrect ? 'correct-option' : '', selectedOption === index && !isAnswerCorrect ? 'incorrect-option' : '']"
-          @click="selectOption(index)"
+          :class="[
+            selectedOption === index && isAnswerCorrect ? 'correct-option' : '',
+            selectedOption === index && !isAnswerCorrect ? 'incorrect-option' : ''
+          ]"
+          @click="selectOption(index, $event)"
           :disabled="timeExpired || selectedOption !== null"
         >
-          {{ option }}
+          {{ option.text }}
         </button>
       </div>
     </div>
@@ -33,11 +36,11 @@
       <p v-else class="timeout-feedback">Время вышло!</p>
     </div>
 
-    <!-- Hint component with close event listener -->
-    <Hint ref="hintComponent" :hint="currentHint" @close="onHintClosed" />
+    <!-- Hint component -->
+    <Hint ref="hintComponent" :hint="currentHint" />
 
     <div class="footer">
-      <button class="hint-button" @click="showHint">Подсказка</button>
+      <button class="hint-button" @click="showHint" v-if="!showHintOnWrongAnswer">Подсказка</button>
     </div>
   </div>
 </template>
@@ -51,13 +54,10 @@ export default {
   },
   data() {
     return {
-      componentKey: 0, // This is the key that will force the component to re-render
+      componentKey: 0,
       questionText: '',
       options: [],
-      originalOptions: [],
-      currentHint: '',
-      correctOption: null,
-      originalCorrectOption: null,
+      correctOptionId: null,
       selectedOption: null,
       countdown: 15,
       progressBarWidth: 100,
@@ -66,83 +66,175 @@ export default {
       isAnswerCorrect: null,
       showFeedback: false,
       showQuestion: false,
+      userId: "",
+      topicId: null,           // Now initialized as null
+      subtopicId: null,        // Now initialized as null
+      difficultyLevel: null,   // Now initialized as null
+      currentHint: '',
+      showHintOnWrongAnswer: false,
+      waitingForNextQuestion: false,
+      screenClickHandlerAdded: false,
+      questionStartTime: null,
     };
   },
   async mounted() {
+    this.userId = localStorage.getItem('userId');
     await this.fetchQuestion();
     this.startCountdown();
   },
   methods: {
     async fetchQuestion() {
-      // Clear existing question data
+      this.resetQuestionData();
+
+      // Fetch question from the API
+      try {
+        const response = await fetch("https://torx0u7d37.execute-api.eu-west-2.amazonaws.com/main/choose_questione", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            UserID: this.userId,
+          }),
+        });
+        const data = await response.json();
+
+        // Extract topicId and subtopicId from question_id
+        const questionIdParts = data.question_id.split('-');
+        this.topicId = questionIdParts[0];       // e.g., "01"
+        this.subtopicId = `${questionIdParts[0]}-${questionIdParts[1]}`; // e.g., "01-04"
+
+        // Store difficulty level
+        this.difficultyLevel = data.difficulty;
+
+        this.questionText = data.question_text;
+
+        this.options = data.options.map(option => ({
+          text: option.text,
+          optionId: option.option_id,
+        }));
+
+        this.correctOptionId = data.correct_option;
+        this.currentHint = data.theory || '';
+
+        // Shuffle the options
+        this.options = this.shuffleOptions(this.options);
+
+        if (this.$refs.hintComponent) {
+          this.$refs.hintComponent.hide(false);
+        }
+      } catch (error) {
+        console.error("Failed to fetch the question:", error);
+      }
+    },
+
+    resetQuestionData() {
       this.questionText = '';
       this.options = [];
-      this.currentHint = '';
-      this.correctOption = null;
-      this.originalCorrectOption = null;
+      this.correctOptionId = null;
       this.isAnswerCorrect = null;
       this.selectedOption = null;
       this.timeExpired = false;
       this.showFeedback = false;
       this.showQuestion = false;
-
-      // Simulate an API call delay
-      const simulatedApiResponse = await new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({
-            questionText: "Что следует сделать при проезде пешеходного перехода?",
-            options: [
-              "Продолжить движение на той же скорости.",
-              "Остановиться и уступить дорогу пешеходам.",
-              "Просигналить пешеходам, чтобы они ускорились.",
-              "Объехать пешеходов по тротуару.",
-            ],
-            hint: "Остановитесь и пропустите пешеходов на переходе.",
-            correctOption: 1,
-          });
-        }, 1000); // Simulate a 1-second delay
-      });
-
-      this.questionText = simulatedApiResponse.questionText;
-      this.originalOptions = simulatedApiResponse.options.slice();
-      this.originalCorrectOption = simulatedApiResponse.correctOption;
-      this.options = this.shuffleOptions(this.originalOptions);
-      this.currentHint = simulatedApiResponse.hint;
-
-      if (this.$refs.hintComponent) {
-        this.$refs.hintComponent.hide(false);
-      }
+      this.showHintOnWrongAnswer = false;
+      this.waitingForNextQuestion = false;
+      this.questionStartTime = null;
+      this.topicId = null;         // Reset topicId
+      this.subtopicId = null;      // Reset subtopicId
+      this.difficultyLevel = null; // Reset difficultyLevel
     },
 
-    shuffleOptions(options) {
-      const shuffledOptions = [...options];
-      for (let i = shuffledOptions.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
-      }
-      const correctAnswerText = this.originalOptions[this.originalCorrectOption];
-      this.correctOption = shuffledOptions.findIndex((option) => option === correctAnswerText);
-
-      return shuffledOptions;
-    },
-
-    selectOption(index) {
+    async selectOption(index, event) {
+      event.stopPropagation();
       if (!this.timeExpired && this.selectedOption === null) {
         this.selectedOption = index;
         clearInterval(this.countdownInterval);
         this.timeExpired = true;
-        this.isAnswerCorrect = index === this.correctOption;
+        this.isAnswerCorrect = this.options[index].optionId === this.correctOptionId;
         this.showFeedback = true;
 
+        // Calculate time taken
+        const timeTaken = (Date.now() - this.questionStartTime) / 1000;
+
+        // Send POST request
+        await this.sendResponseData(this.isAnswerCorrect, timeTaken);
+
         if (this.isAnswerCorrect) {
-          setTimeout(() => {
-            this.resetStateForNextQuestion();
-          }, 2000);
+          this.waitingForNextQuestion = true;
+          this.addClickListener();
         } else {
           setTimeout(() => {
             this.showHint();
+            this.showHintOnWrongAnswer = true;
+            this.waitingForNextQuestion = true;
+            this.addClickListener();
           }, 2000);
         }
+      }
+    },
+
+    // Send response data to the server
+    async sendResponseData(responseCorrect, timeTaken) {
+      const postData = {
+        user_id: this.userId,
+        response_correct: responseCorrect,
+        time_taken: timeTaken,
+        difficulty_level: this.difficultyLevel, // Use extracted value
+        topic_id: this.topicId,                 // Use extracted value
+        subtopic_id: this.subtopicId,           // Use extracted value
+      };
+
+      try {
+        const response = await fetch("https://torx0u7d37.execute-api.eu-west-2.amazonaws.com/main/update_level", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(postData),
+        });
+        const data = await response.json();
+        console.log("Response from update_level:", data);
+      } catch (error) {
+        console.error("Failed to update level:", error);
+      }
+    },
+
+    // Handle time expired scenario
+    async handleTimeExpired() {
+      // Time expired, so time taken is the full countdown duration
+      const timeTaken = 15;
+
+      // Send POST request with response_correct: false
+      await this.sendResponseData(false, timeTaken);
+
+      setTimeout(() => {
+        this.showHint();
+      }, 1000);
+    },
+
+    // Add click listener to wait for user input
+    addClickListener() {
+      if (!this.screenClickHandlerAdded) {
+        window.addEventListener('click', this.onScreenClick);
+        this.screenClickHandlerAdded = true;
+      }
+    },
+
+    // Remove click listener
+    removeClickListener() {
+      if (this.screenClickHandlerAdded) {
+        window.removeEventListener('click', this.onScreenClick);
+        this.screenClickHandlerAdded = false;
+      }
+    },
+
+    // Detect screen click to load the next question after feedback or hint is shown
+    onScreenClick() {
+      if (this.waitingForNextQuestion) {
+        this.resetStateForNextQuestion();
+        this.waitingForNextQuestion = false;
+        this.removeClickListener();
       }
     },
 
@@ -152,34 +244,37 @@ export default {
       }
     },
 
-    onHintClosed() {
-      this.resetStateForSameQuestion();
+    shuffleOptions(options) {
+      const shuffledOptions = [...options];
+      for (let i = shuffledOptions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+      }
+      return shuffledOptions;
     },
 
     startCountdown() {
-      console.log('startCountdown called');
-
       if (this.countdownInterval) {
         clearInterval(this.countdownInterval);
       }
 
+      this.questionStartTime = Date.now(); // Initialize the start time
+
       const countdownFunction = () => {
         if (this.countdown >= 0) {
           this.progressBarWidth = (this.countdown / 15) * 100;
-          console.log(`Progress Bar Width: ${this.progressBarWidth}%, Countdown: ${this.countdown}`);
           this.countdown--;
-        } else if (this.progressBarWidth == 0){
+        } else {
           this.progressBarWidth = 0;
           clearInterval(this.countdownInterval);
           this.timeExpired = true;
           this.showFeedback = true;
-          setTimeout(() => {
-            this.showHint();
-          }, 1000);
+
+          // Handle time expired
+          this.handleTimeExpired();
         }
       };
 
-      // Increment key to fully reset the component
       this.componentKey += 1;
       this.showQuestion = true;
       this.selectedOption = null;
@@ -189,28 +284,12 @@ export default {
       this.isAnswerCorrect = null;
       this.showFeedback = false;
 
-      // Start the countdown immediately
       this.countdownInterval = setInterval(countdownFunction, 1000);
       countdownFunction();
     },
 
-    resetStateForSameQuestion() {
-
-      this.options = this.shuffleOptions(this.originalOptions);
-
-      if (this.$refs.hintComponent) {
-        this.$refs.hintComponent.hide(false);
-      }
-
-      this.$nextTick(() => {
-        this.startCountdown();
-      });
-    },
-
     async resetStateForNextQuestion() {
-
       await this.fetchQuestion();
-
       this.$nextTick(() => {
         this.startCountdown();
       });
@@ -218,6 +297,14 @@ export default {
   },
 };
 </script>
+
+
+
+
+
+
+
+
 
 
 

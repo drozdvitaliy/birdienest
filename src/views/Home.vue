@@ -49,12 +49,22 @@ export default {
         this.log('First Name: ' + this.firstName);
         this.log('Last Name: ' + this.lastName);
         this.log('Username: ' + this.username);
-
-        // Fetch user data from Lambda
-        this.getUserData();
       } else {
         this.log('Telegram object is not available');
       }
+
+      // Store user data in localStorage
+      this.storeUserDataInLocalStorage();
+
+      // Fetch user data from Lambda
+      this.getUserData();
+    },
+    storeUserDataInLocalStorage() {
+      // Store user data in localStorage
+      localStorage.setItem('userId', this.userId);
+      localStorage.setItem('firstName', this.firstName);
+      localStorage.setItem('lastName', this.lastName);
+      localStorage.setItem('username', this.username);
     },
     getUserData() {
       // Build the API endpoint
@@ -98,6 +108,10 @@ export default {
           this.progress = 0;
           this.log('Progress not provided in response, defaulting to 0.');
         }
+
+        // Optionally, update firstName and progress in localStorage
+        localStorage.setItem('firstName', this.firstName);
+        localStorage.setItem('progress', this.progress.toString());
       })
       .catch(error => {
         this.log('Error fetching user data from Lambda:', error.message);
@@ -118,6 +132,8 @@ export default {
   }
 };
 </script>
+
+
 
 
 

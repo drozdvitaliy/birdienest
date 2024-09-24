@@ -21,6 +21,7 @@
           ]"
           @click="selectOption(index, $event)"
           :disabled="timeExpired || selectedOption !== null"
+          :style="(timeExpired || selectedOption !== null) ? { 'pointer-events': 'none' } : {}"
         >
           {{ option.text }}
         </button>
@@ -42,6 +43,14 @@
     <div class="footer">
       <button class="hint-button" @click="showHint" v-if="!showHintOnWrongAnswer">Подсказка</button>
     </div>
+
+    <!-- Full-screen overlay to capture clicks and touches -->
+    <div
+      v-if="waitingForNextQuestion"
+      class="click-overlay"
+      @click="onScreenClick"
+      @touchend="onScreenClick"
+    ></div>
   </div>
 </template>
 
@@ -66,19 +75,18 @@ export default {
       isAnswerCorrect: null,
       showFeedback: false,
       showQuestion: false,
-      userId: "",
-      topicId: null,           // Now initialized as null
-      subtopicId: null,        // Now initialized as null
-      difficultyLevel: null,   // Now initialized as null
+      userId: '',
+      topicId: null,
+      subtopicId: null,
+      difficultyLevel: null,
       currentHint: '',
       showHintOnWrongAnswer: false,
       waitingForNextQuestion: false,
-      screenClickHandlerAdded: false,
       questionStartTime: null,
     };
   },
   async mounted() {
-    this.userId = localStorage.getItem('userId');
+    this.userId = localStorage.getItem('userId') || '423268153';
     await this.fetchQuestion();
     this.startCountdown();
   },
@@ -88,20 +96,23 @@ export default {
 
       // Fetch question from the API
       try {
-        const response = await fetch("https://torx0u7d37.execute-api.eu-west-2.amazonaws.com/main/choose_questione", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            UserID: this.userId,
-          }),
-        });
+        const response = await fetch(
+          'https://torx0u7d37.execute-api.eu-west-2.amazonaws.com/main/choose_questione',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              UserID: this.userId,
+            }),
+          }
+        );
         const data = await response.json();
 
         // Extract topicId and subtopicId from question_id
         const questionIdParts = data.question_id.split('-');
-        this.topicId = questionIdParts[0];       // e.g., "01"
+        this.topicId = questionIdParts[0]; // e.g., "01"
         this.subtopicId = `${questionIdParts[0]}-${questionIdParts[1]}`; // e.g., "01-04"
 
         // Store difficulty level
@@ -109,7 +120,7 @@ export default {
 
         this.questionText = data.question_text;
 
-        this.options = data.options.map(option => ({
+        this.options = data.options.map((option) => ({
           text: option.text,
           optionId: option.option_id,
         }));
@@ -124,7 +135,7 @@ export default {
           this.$refs.hintComponent.hide(false);
         }
       } catch (error) {
-        console.error("Failed to fetch the question:", error);
+        console.error('Failed to fetch the question:', error);
       }
     },
 
@@ -140,9 +151,9 @@ export default {
       this.showHintOnWrongAnswer = false;
       this.waitingForNextQuestion = false;
       this.questionStartTime = null;
-      this.topicId = null;         // Reset topicId
-      this.subtopicId = null;      // Reset subtopicId
-      this.difficultyLevel = null; // Reset difficultyLevel
+      this.topicId = null;
+      this.subtopicId = null;
+      this.difficultyLevel = null;
     },
 
     async selectOption(index, event) {
@@ -160,15 +171,11 @@ export default {
         // Send POST request
         await this.sendResponseData(this.isAnswerCorrect, timeTaken);
 
-        if (this.isAnswerCorrect) {
-          this.waitingForNextQuestion = true;
-          this.addClickListener();
-        } else {
+        this.waitingForNextQuestion = true;
+        if (!this.isAnswerCorrect) {
           setTimeout(() => {
             this.showHint();
             this.showHintOnWrongAnswer = true;
-            this.waitingForNextQuestion = true;
-            this.addClickListener();
           }, 2000);
         }
       }
@@ -180,23 +187,26 @@ export default {
         user_id: this.userId,
         response_correct: responseCorrect,
         time_taken: timeTaken,
-        difficulty_level: this.difficultyLevel, // Use extracted value
-        topic_id: this.topicId,                 // Use extracted value
-        subtopic_id: this.subtopicId,           // Use extracted value
+        difficulty_level: this.difficultyLevel,
+        topic_id: this.topicId,
+        subtopic_id: this.subtopicId,
       };
 
       try {
-        const response = await fetch("https://torx0u7d37.execute-api.eu-west-2.amazonaws.com/main/update_level", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(postData),
-        });
+        const response = await fetch(
+          'https://torx0u7d37.execute-api.eu-west-2.amazonaws.com/main/update_level',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(postData),
+          }
+        );
         const data = await response.json();
-        console.log("Response from update_level:", data);
+        console.log('Response from update_level:', data);
       } catch (error) {
-        console.error("Failed to update level:", error);
+        console.error('Failed to update level:', error);
       }
     },
 
@@ -211,31 +221,14 @@ export default {
       setTimeout(() => {
         this.showHint();
       }, 1000);
+
+      this.waitingForNextQuestion = true;
     },
 
-    // Add click listener to wait for user input
-    addClickListener() {
-      if (!this.screenClickHandlerAdded) {
-        window.addEventListener('click', this.onScreenClick);
-        this.screenClickHandlerAdded = true;
-      }
-    },
-
-    // Remove click listener
-    removeClickListener() {
-      if (this.screenClickHandlerAdded) {
-        window.removeEventListener('click', this.onScreenClick);
-        this.screenClickHandlerAdded = false;
-      }
-    },
-
-    // Detect screen click to load the next question after feedback or hint is shown
-    onScreenClick() {
-      if (this.waitingForNextQuestion) {
-        this.resetStateForNextQuestion();
-        this.waitingForNextQuestion = false;
-        this.removeClickListener();
-      }
+    onScreenClick(event) {
+      event.stopPropagation();
+      this.resetStateForNextQuestion();
+      this.waitingForNextQuestion = false;
     },
 
     showHint() {
@@ -312,7 +305,18 @@ export default {
 
 
 
+
 <style scoped>
+
+.click-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+}
+
 .quiz-container {
   display: flex;
   flex-direction: column;

@@ -26,7 +26,7 @@
       hide(emitClose = true) {
         this.showHint = false;  // Hide the hint when clicking outside
         if (emitClose) {
-          this.$emit('close');    // Emit the 'close' event to notify the parent component
+            this.$emit('hint-closed');
         }
       },
     },

@@ -38,10 +38,10 @@
     </div>
 
     <!-- Hint component -->
-    <Hint ref="hintComponent" :hint="currentHint" />
+    <Hint ref="hintComponent" :hint="currentHint" @hint-closed="onHintClosed" />
 
     <div class="footer">
-      <button class="hint-button" @click="showHint" v-if="!showHintOnWrongAnswer">Подсказка</button>
+      <button class="hint-button" @click="showHint()">Подсказка</button>
     </div>
 
     <!-- Full-screen overlay to capture clicks and touches -->
@@ -80,9 +80,9 @@ export default {
       subtopicId: null,
       difficultyLevel: null,
       currentHint: '',
-      showHintOnWrongAnswer: false,
       waitingForNextQuestion: false,
       questionStartTime: null,
+      proceedToNextQuestionAfterHint: false, // Added variable
     };
   },
   async mounted() {
@@ -148,12 +148,12 @@ export default {
       this.timeExpired = false;
       this.showFeedback = false;
       this.showQuestion = false;
-      this.showHintOnWrongAnswer = false;
       this.waitingForNextQuestion = false;
       this.questionStartTime = null;
       this.topicId = null;
       this.subtopicId = null;
       this.difficultyLevel = null;
+      this.proceedToNextQuestionAfterHint = false; // Reset the flag
     },
 
     async selectOption(index, event) {
@@ -162,7 +162,8 @@ export default {
         this.selectedOption = index;
         clearInterval(this.countdownInterval);
         this.timeExpired = true;
-        this.isAnswerCorrect = this.options[index].optionId === this.correctOptionId;
+        this.isAnswerCorrect =
+          this.options[index].optionId === this.correctOptionId;
         this.showFeedback = true;
 
         // Calculate time taken
@@ -171,12 +172,12 @@ export default {
         // Send POST request
         await this.sendResponseData(this.isAnswerCorrect, timeTaken);
 
-        this.waitingForNextQuestion = true;
-        if (!this.isAnswerCorrect) {
-          setTimeout(() => {
-            this.showHint();
-            this.showHintOnWrongAnswer = true;
-          }, 2000);
+        if (this.isAnswerCorrect) {
+          // If the answer is correct, wait for the next question
+          this.waitingForNextQuestion = true;
+        } else {
+          // If the answer is incorrect, show the hint immediately
+          this.showHint(true); // Pass true to proceed after the hint
         }
       }
     },
@@ -218,11 +219,10 @@ export default {
       // Send POST request with response_correct: false
       await this.sendResponseData(false, timeTaken);
 
-      setTimeout(() => {
-        this.showHint();
-      }, 1000);
+      this.showFeedback = true;
 
-      this.waitingForNextQuestion = true;
+      // Show the hint immediately
+      this.showHint(true); // Pass true to proceed after the hint
     },
 
     onScreenClick(event) {
@@ -231,9 +231,18 @@ export default {
       this.waitingForNextQuestion = false;
     },
 
-    showHint() {
+    showHint(proceedToNextQuestionAfterHint = false) {
       if (this.$refs.hintComponent) {
         this.$refs.hintComponent.show();
+        this.proceedToNextQuestionAfterHint = proceedToNextQuestionAfterHint;
+      }
+    },
+
+    onHintClosed() {
+      if (this.proceedToNextQuestionAfterHint) {
+        // If we should proceed to next question after hint, set waitingForNextQuestion
+        this.waitingForNextQuestion = true;
+        this.proceedToNextQuestionAfterHint = false; // Reset the flag
       }
     },
 
@@ -241,7 +250,10 @@ export default {
       const shuffledOptions = [...options];
       for (let i = shuffledOptions.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+        [shuffledOptions[i], shuffledOptions[j]] = [
+          shuffledOptions[j],
+          shuffledOptions[i],
+        ];
       }
       return shuffledOptions;
     },
@@ -261,7 +273,6 @@ export default {
           this.progressBarWidth = 0;
           clearInterval(this.countdownInterval);
           this.timeExpired = true;
-          this.showFeedback = true;
 
           // Handle time expired
           this.handleTimeExpired();

@@ -2,7 +2,7 @@
   <div class="countdown-background">
     <div class="countdown-container">
       <!-- Countdown Display -->
-      <div v-if="count > 1" class="countdown-number">
+      <div v-if="count > 0" class="countdown-number">
         {{ count }}
       </div>
 
@@ -55,14 +55,14 @@ export default {
   methods: {
     startCountdown() {
       this.countdownInterval = setInterval(() => {
-        if (this.count > 1) {
+        if (this.count > 0) {
           this.count--;
         } else {
           clearInterval(this.countdownInterval);
           this.count = 0;
           this.showQuiz = true; // Show the quiz after countdown reaches 1
         }
-      }, 1);
+      }, 1000);
     },
     selectOption(index) {
       // Handle the selected option

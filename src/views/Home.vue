@@ -1,6 +1,6 @@
 <template>
-  <div class="app-background">
-    <div class="start-screen">
+  <div class="app-background" @click="handleGlobalClick">
+    <div class="start-screen" @click.stop>
       <h1>🌸 Время лучше узнать друг друга!</h1>
       <p>👥 Введите юзернэйм вашего партнёра, чтобы начать ваше совместное путешествие:</p>
       
@@ -32,6 +32,16 @@ export default {
   mounted() {
     // Извлекаем данные о текущем пользователе через Telegram API при загрузке страницы
     this.extractTelegramData();
+    
+    // Add global click listener to detect clicks outside the input
+    document.addEventListener('click', this.handleClickOutside);
+    // For mobile devices, it's good to also listen to touchstart
+    document.addEventListener('touchstart', this.handleClickOutside);
+  },
+  beforeDestroy() {
+    // Remove the event listeners when the component is destroyed
+    document.removeEventListener('click', this.handleClickOutside);
+    document.removeEventListener('touchstart', this.handleClickOutside);
   },
   methods: {
     extractTelegramData() {
@@ -48,7 +58,9 @@ export default {
     
     async startGame() {
       // Dismiss the keyboard by blurring the input
-      this.$refs.partnerInput.blur();
+      if (this.$refs.partnerInput) {
+        this.$refs.partnerInput.blur();
+      }
 
       if (!this.partnerUsername.startsWith('@')) {
         this.errorMessage = 'Юзернэйм должен начинаться с @.';
@@ -94,9 +106,30 @@ export default {
         this.errorMessage = 'Произошла ошибка: ' + error.message;
       }
     },
+    
+    handleClickOutside(event) {
+      // Check if the click was outside the input field
+      const input = this.$refs.partnerInput;
+      if (input && !input.contains(event.target)) {
+        input.blur(); // Remove focus to hide the keyboard
+      }
+    },
+    
+    handleGlobalClick(event) {
+      // Optional: Additional logic if needed when clicking on the background
+    },
   },
 };
 </script>
+
+<style scoped>
+/* Ваши стили здесь */
+.error {
+  color: red;
+  margin-top: 10px;
+}
+</style>
+
 
 
 

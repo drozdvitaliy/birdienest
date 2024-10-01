@@ -1,198 +1,185 @@
 <template>
-  <div class="home-container">
-    <!-- Greeting text -->
-    <h1>Здравствуйте, {{ firstName }}</h1>
-
-    <!-- Green button with click event -->
-    <div class="start-button-container">
-      <button class="start-button" @click="goToTest">НАЧАТЬ</button>
+  <div class="app-background">
+    <div class="start-screen">
+      <h1>🌸 Время лучше узнать друг друга!</h1>
+      <p>👥 Введите юзернэйм вашего партнёра, чтобы начать ваше совместное путешествие:</p>
+      
+      <!-- Поле для ввода юзернэйма партнёра -->
+      <input type="text" v-model="partnerUsername" placeholder="@username" />
+      
+      <!-- Кнопка запуска игры -->
+      <button @click="startGame">Начать игру 💖</button>
+      <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     </div>
-
-    <!-- Progress text at the bottom -->
-    <p class="progress-text">Усвоено теории: {{ progress }}%</p>
-
-    <!-- Optional: Display logs for debugging -->
-    <!-- <div v-for="(log, index) in logs" :key="index">{{ log }}</div> -->
   </div>
 </template>
 
 <script>
 export default {
-  name: 'Home',
   data() {
     return {
-      userId: '423268153',  // Default to '423268153', will be updated from Telegram
-      firstName: 'User',    // Default name if not retrieved
-      lastName: '',         // To store the Telegram user's last name
-      username: '',         // To store the Telegram username
-      progress: 0,          // User's progress percentage
-      logs: []              // To store logs for debugging
+      username: '@Vitaliy_Drozd',  // Юзернэйм текущего пользователя (из Telegram)
+      partnerUsername: '',         // Юзернэйм партнёра (вводится пользователем)
+      errorMessage: '',            // Сообщение об ошибке
     };
   },
+  mounted() {
+    // Извлекаем данные о текущем пользователе через Telegram API при загрузке страницы
+    this.extractTelegramData();
+  },
   methods: {
-    goToTest() {
-      this.$router.push('/test');
-    },
     extractTelegramData() {
       if (typeof window.Telegram !== 'undefined' && window.Telegram.WebApp) {
-        this.log('Telegram object is available');
-
         const initDataUnsafe = window.Telegram.WebApp.initDataUnsafe;
         const user = initDataUnsafe.user;
 
-        this.userId = user ? user.id : this.userId; // Use default if not available
-        this.firstName = user ? user.first_name : this.firstName;
-        this.lastName = user ? user.last_name : '';
-        this.username = user ? user.username : '';
-
-        this.log('User ID: ' + this.userId);
-        this.log('First Name: ' + this.firstName);
-        this.log('Last Name: ' + this.lastName);
-        this.log('Username: ' + this.username);
+        this.username = user ? `@${user.username}` : '@Vitaliy_Drozd';
+        console.log('Текущий юзернэйм: ' + this.username);
       } else {
-        this.log('Telegram object is not available');
+        console.log('Telegram WebApp object не доступен');
+      }
+    },
+    
+    async startGame() {
+      if (!this.partnerUsername.startsWith('@')) {
+        this.errorMessage = 'Юзернэйм должен начинаться с @.';
+        return;
       }
 
-      // Store user data in localStorage
-      this.storeUserDataInLocalStorage();
+      if (!this.username) {
+        this.errorMessage = 'Ошибка: не удалось получить ваш юзернэйм.';
+        return;
+      }
 
-      // Fetch user data from Lambda
-      this.getUserData();
-    },
-    storeUserDataInLocalStorage() {
-      // Store user data in localStorage
-      localStorage.setItem('userId', this.userId);
-      localStorage.setItem('firstName', this.firstName);
-      localStorage.setItem('lastName', this.lastName);
-      localStorage.setItem('username', this.username);
-    },
-    getUserData() {
-      // Build the API endpoint
-      const apiEndpoint = 'https://torx0u7d37.execute-api.eu-west-2.amazonaws.com/main/getuser';
+      try {
+        const response = await fetch('https://udaejtcmj5.execute-api.eu-west-2.amazonaws.com/main/gamecreation', {
+          method: 'POST',
+          body: JSON.stringify({
+            username: this.username,              // Юзернэйм текущего пользователя
+            partnerUsername: this.partnerUsername, // Юзернэйм партнёра
+          }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-      // Prepare the request body
-      const requestBody = {
-        UserID: this.userId
-      };
+        const data = await response.json();  // Получаем ответ от Lambda
 
-      fetch(apiEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      })
-      .then(response => {
-        if (!response.ok) {
-          // Handle HTTP errors
-          return response.json().then(errorData => {
-            throw new Error(`Error ${response.status}: ${errorData.error || response.statusText}`);
-          });
-        }
-        return response.json();
-      })
-      .then(data => {
-        this.log('Received data from Lambda:', data);
+        if (response.ok) {
+          const { gameId, status } = data;
 
-        // Update the component's data properties based on the response
-        if (data && data.Name) {
-          this.firstName = data.Name;
-          this.log('Updated firstName:', this.firstName);
-        }
+          // Сохраняем gameId и юзернэйм партнёра в localStorage
+          localStorage.setItem('gameId', gameId);
+          localStorage.setItem('partnerUsername', this.partnerUsername);
 
-        if (data && data.Progress !== undefined) {
-          this.progress = data.Progress;
-          this.log('Updated progress:', this.progress);
+          // Перенаправляем пользователя в зависимости от статуса
+          if (status === 'waiting') {
+            this.$router.push(`/waiting?gameId=${gameId}`);
+          } else if (status === 'ready') {
+            this.$router.push(`/test?gameId=${gameId}`);
+          }
         } else {
-          // If progress is not provided, default to 0
-          this.progress = 0;
-          this.log('Progress not provided in response, defaulting to 0.');
+          this.errorMessage = 'Ошибка при начале игры. Попробуйте снова.';
         }
-
-        // Optionally, update firstName and progress in localStorage
-        localStorage.setItem('firstName', this.firstName);
-        localStorage.setItem('progress', this.progress.toString());
-      })
-      .catch(error => {
-        this.log('Error fetching user data from Lambda:', error.message);
-        // Handle errors gracefully
-        this.firstName = 'User';
-        this.progress = 0;
-      });
+      } catch (error) {
+        this.errorMessage = 'Произошла ошибка: ' + error.message;
+      }
     },
-    log(...messages) {
-      // Simple log function to store messages in the logs array
-      const message = messages.join(' ');
-      this.logs.push(message);
-      console.log(message); // Also log to console for debugging
-    }
   },
-  mounted() {
-    this.extractTelegramData();
-  }
 };
 </script>
 
 
 
-
-
-
 <style scoped>
-/* Main container to align everything vertically */
-.home-container {
+
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&family=Roboto:wght@400&display=swap');
+
+.app-background {
+  background-size: cover;
+  background-position: center;
+  height: 100vh;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  justify-content: center;  /* Горизонтальное выравнивание по центру */
+  align-items: center;      /* Вертикальное выравнивание по центру */
+  padding: 0 16px;          /* Отступы по бокам */
+}
+
+/* Основной экран */
+.start-screen {
+  background: rgba(255, 255, 255, 0.9); /* Прозрачный белый блок */
+  border-radius: 15px;
+  padding: 40px;
   text-align: center;
-  height: 100vh; /* Full height to ensure it covers the entire screen */
-  color: white; /* Text color */
-  padding: 15vw;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
 }
 
-/* Greeting text */
+/* Заголовок */
 h1 {
-  font-size: 3rem; /* Adjust size to your preference */
-  font-weight: 500;
-  margin: 0 0 50vw 0; /* Space between greeting and button */
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 600;
+  color: #4a4a4a;
+  margin-bottom: 24px;
+  font-size: 26px;
+  letter-spacing: 1px;
 }
 
-/* Button container */
-.start-button-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: auto; /* Space between button and bottom text */
-  margin-top: -20vw; 
+/* Описание */
+p {
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 24px;
+  line-height: 1.6;
 }
 
-/* Button styling */
-.start-button {
-  background-color: #c5ff61; /* Green background */
-  border: 5px solid #d46af8; /* Purple border */
-  color: #d46af8; /* Purple text color */
-  border-radius: 50%; /* Make the button round */
-  width: 60vw; 
-  height: 60vw;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 1.5rem; /* Adjust text size inside the button */
-  font-weight: 700;
+/* Поле для ввода */
+input {
+  padding: 14px;
+  font-size: 16px;
+  border: 2px solid #d1d1e0;
+  border-radius: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 24px;
+  transition: border-color 0.3s ease;
+  font-family: 'Roboto', sans-serif;
+}
+
+/* Изменение цвета поля при фокусе */
+input:focus {
+  border-color: #b48ec1;
+  outline: none;
+}
+
+/* Кнопка начала игры */
+button {
+  background-color: #b48ec1;
+  color: white;
+  padding: 14px 28px;
+  font-size: 18px;
+  border: none;
+  border-radius: 12px;
   cursor: pointer;
-  transition: transform 0.3s ease; /* Button animation effect */
+  font-family: 'Quicksand', sans-serif;
+  transition: background-color 0.3s ease;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
 }
 
-/* Button hover effect */
-.start-button:hover {
-  transform: scale(1.4); /* Slight zoom effect on hover */
+/* Кнопка при наведении */
+button:hover {
+  background-color: #a377b0;
 }
 
-/* Progress text at the bottom */
-.progress-text {
-  font-size: 6vw;
-  font-weight: 700;
-  margin-bottom: 30vw;
+/* Сообщение об ошибке */
+.error {
+  color: #e74c3c;
+  font-size: 14px;
+  margin-top: -12px;
+  font-family: 'Roboto', sans-serif;
 }
+
 </style>

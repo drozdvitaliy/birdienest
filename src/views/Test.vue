@@ -6,6 +6,11 @@
         {{ count }}
       </div>
 
+      <!-- Waiting for Opponent -->
+      <div v-else-if="waitingForOpponent" class="waiting-container">
+        <h2 class="waiting-message">Waiting for opponent to join...</h2>
+      </div>
+
       <!-- Quiz Display -->
       <div v-else-if="showQuiz" class="quiz-container">
         <h2 class="quiz-question">{{ currentQuestion.question }}</h2>
@@ -15,22 +20,25 @@
               @click="selectOption(index)" 
               class="quiz-button"
               :class="{ selected: selectedOptionIndex === index }" 
+              :disabled="selectedOptionIndex !== null" <!-- Disable after selection -->
             >
               {{ option }}
             </button>
           </li>
         </ul>
+        <div v-if="opponentAnswer" class="opponent-response">
+          <p>Opponent's Answer: {{ opponentAnswer }}</p>
+        </div>
       </div>
 
       <!-- Final Message -->
       <div v-else class="countdown-message">
-        <!-- <h1>✨ Пусть начнётся магия! ✨</h1> -->
+        <p>Спасибо за участие!</p>
       </div>
     </div>
     <div class="sparkles"></div>
   </div>
 </template>
-
 
 <script>
 export default {
@@ -40,23 +48,35 @@ export default {
       count: 5,
       countdownInterval: null,
       showQuiz: false,
-      currentQuestion: {
-        question: 'Что ты ценишь больше всего в нашем общении?',
-        options: [
-          'Открытость и честность ',
-          'Общие интересы и хобби',
-          'Поддержку и понимание',
-          'Совместное чувство юмора',
-        ],
-      },
-      selectedOptionIndex: null, // Added for tracking selection
+      waitingForOpponent: false,
+      currentQuestion: {},
+      selectedOptionIndex: null,
+      opponentAnswer: null,
+      websocket: null,
+      sessionId: null,
+      gameId: null,
+      username: null,
     };
   },
   mounted() {
+    // Retrieve gameId and username from localStorage
+    this.gameId = localStorage.getItem('gameId');
+    this.username = localStorage.getItem('username'); // Ensure this is set before mounting
+
+    if (!this.gameId || !this.username) {
+      console.error('Missing gameId or username in local storage.');
+      alert('Game ID or Username not found. Please start or join a game first.');
+      return;
+    }
+
     this.startCountdown();
+    this.initWebSocket();
   },
   beforeUnmount() {
     clearInterval(this.countdownInterval);
+    if (this.websocket) {
+      this.websocket.close();
+    }
   },
   methods: {
     startCountdown() {
@@ -66,18 +86,130 @@ export default {
         } else {
           clearInterval(this.countdownInterval);
           this.count = 0;
-          this.showQuiz = true; // Show the quiz after countdown reaches 0
+          // After countdown, attempt to join the game
+          this.joinGame();
         }
       }, 1000);
     },
+    initWebSocket() {
+      const wsUrl = 'wss://ayfcf5re9e.execute-api.eu-west-2.amazonaws.com/production/'; // Replace with your actual WebSocket URL
+      this.websocket = new WebSocket(wsUrl);
+
+      this.websocket.onopen = () => {
+        console.log('WebSocket connection established.');
+        // Optionally, you can send a greeting message or perform other actions
+      };
+
+      this.websocket.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        this.handleWebSocketMessage(message);
+      };
+
+      this.websocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        alert('WebSocket encountered an error. Please try again later.');
+      };
+
+      this.websocket.onclose = () => {
+        console.log('WebSocket connection closed.');
+        // Optionally, notify the user or attempt to reconnect
+      };
+    },
+    joinGame() {
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        const payload = {
+          action: 'join_game',
+          data: {
+            gameId: this.gameId,
+            username: this.username
+          }
+        };
+        this.websocket.send(JSON.stringify(payload));
+        console.log(`Sent join_game for gameId: ${this.gameId}, username: ${this.username}`);
+        this.waitingForOpponent = true;
+      } else {
+        console.error('WebSocket is not open. Cannot join game.');
+      }
+    },
+    handleWebSocketMessage(message) {
+      switch (message.action) {
+        case 'session_start':
+          this.sessionId = message.data.gameId;
+          console.log('Session started with gameId:', this.sessionId);
+          this.waitingForOpponent = false;
+          // Optionally, request the first question immediately
+          this.requestQuestion();
+          break;
+        case 'waiting_for_opponent':
+          this.waitingForOpponent = true;
+          console.log('Waiting for opponent to join...');
+          break;
+        case 'question':
+          this.currentQuestion = {
+            question: message.data.question,
+            options: message.data.options,
+          };
+          this.showQuiz = true;
+          this.opponentAnswer = null; // Reset opponent's answer for new question
+          console.log('Received question:', this.currentQuestion);
+          break;
+        case 'opponent_answer':
+          this.opponentAnswer = message.data.answer;
+          console.log('Received opponent\'s answer:', this.opponentAnswer);
+          break;
+        case 'opponent_disconnected':
+          alert('Your opponent has disconnected.');
+          // Optionally, reset the quiz state or redirect the user
+          this.resetQuiz();
+          break;
+        case 'error':
+          console.error('Error from server:', message.data.message);
+          alert(`Error: ${message.data.message}`);
+          break;
+        default:
+          console.warn('Unknown action:', message.action);
+      }
+    },
+    requestQuestion() {
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        const payload = {
+          action: 'send_question',
+          data: {
+            gameId: this.gameId
+          }
+        };
+        this.websocket.send(JSON.stringify(payload));
+        console.log('Requested question for gameId:', this.gameId);
+      } else {
+        console.error('WebSocket is not open. Cannot request question.');
+      }
+    },
     selectOption(index) {
+      if (this.selectedOptionIndex !== null) return; // Prevent multiple selections
+
       this.selectedOptionIndex = index; // Track the selected option
       const selectedOption = this.currentQuestion.options[index];
-      console.log(`Вы выбрали: ${selectedOption}`);
-      // Proceed to the next step, such as navigating to another page or showing the next question
-      // Example:
-      // this.$router.push('/thank-you');
+      console.log(`Selected option: ${selectedOption}`);
+
+      // Send the selected option to the backend
+      const payload = {
+        action: 'receive_answer',
+        data: {
+          gameId: this.gameId,
+          answer: selectedOption,
+        },
+      };
+      this.websocket.send(JSON.stringify(payload));
+      console.log('Sent answer to backend.');
     },
+    resetQuiz() {
+      this.showQuiz = false;
+      this.currentQuestion = {};
+      this.selectedOptionIndex = null;
+      this.opponentAnswer = null;
+      this.waitingForOpponent = false;
+      // Optionally, reset the countdown or navigate away
+    }
   },
 };
 </script>
@@ -111,11 +243,20 @@ export default {
   animation: pulse 1s infinite;
 }
 
-.countdown-message h1 {
-  font-family: 'Great Vibes', cursive;
-  font-size: 64px;
+.waiting-container {
+  font-family: 'Quicksand', sans-serif;
+  font-size: 24px;
   color: #ffffff;
+}
+
+.waiting-message {
   animation: fadeIn 2s forwards;
+}
+
+.countdown-message p {
+  font-family: 'Quicksand', sans-serif;
+  font-size: 24px;
+  color: #ffffff;
 }
 
 .quiz-container {
@@ -163,6 +304,13 @@ export default {
 
 .quiz-button.selected { /* Highlight selected option */
   background-color: #355d87;
+  color: #ffffff;
+}
+
+.opponent-response {
+  margin-top: 20px;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 18px;
   color: #ffffff;
 }
 
@@ -218,15 +366,15 @@ export default {
   .countdown-number {
     font-size: 120px;
   }
-  .countdown-message h1 {
-    font-size: 48px;
+  .countdown-message p {
+    font-size: 18px;
   }
   .quiz-question {
-    font-size: 36px;
+    font-size: 24px;
   }
   .quiz-button {
-    font-size: 24px;
-    font-weight: 100;
+    font-size: 16px;
+    padding: 10px 20px;
   }
 }
 </style>

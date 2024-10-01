@@ -49,7 +49,7 @@ export default {
         const initDataUnsafe = window.Telegram.WebApp.initDataUnsafe;
         const user = initDataUnsafe.user;
 
-        this.username = user ? `@${user.username}` : '@Vitaliy_Drozd';
+        this.username = user ? `@${user.username}` : '@Vitaliy2';
         console.log('Текущий юзернэйм: ' + this.username);
       } else {
         console.log('Telegram WebApp object не доступен');
@@ -91,6 +91,7 @@ export default {
 
           // Сохраняем gameId и юзернэйм партнёра в localStorage
           localStorage.setItem('gameId', gameId);
+          localStorage.setItem('username', this.username);
           localStorage.setItem('partnerUsername', this.partnerUsername);
 
           // Перенаправляем пользователя в зависимости от статуса

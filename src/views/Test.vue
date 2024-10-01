@@ -20,7 +20,7 @@
               @click="selectOption(index)" 
               class="quiz-button"
               :class="{ selected: selectedOptionIndex === index }" 
-              :disabled="selectedOptionIndex !== null" <!-- Disable after selection -->
+              :disabled="selectedOptionIndex !== null" 
             >
               {{ option }}
             </button>

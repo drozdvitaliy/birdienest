@@ -11,7 +11,11 @@
         <h2 class="quiz-question">{{ currentQuestion.question }}</h2>
         <ul class="quiz-options">
           <li v-for="(option, index) in currentQuestion.options" :key="index">
-            <button @click="selectOption(index)" class="quiz-button">
+            <button 
+              @click="selectOption(index)" 
+              class="quiz-button"
+              :class="{ selected: selectedOptionIndex === index }" 
+            >
               {{ option }}
             </button>
           </li>
@@ -26,6 +30,7 @@
     <div class="sparkles"></div>
   </div>
 </template>
+
 
 <script>
 export default {
@@ -44,6 +49,7 @@ export default {
           'Совместное чувство юмора',
         ],
       },
+      selectedOptionIndex: null, // Added for tracking selection
     };
   },
   mounted() {
@@ -60,17 +66,17 @@ export default {
         } else {
           clearInterval(this.countdownInterval);
           this.count = 0;
-          this.showQuiz = true; // Show the quiz after countdown reaches 1
+          this.showQuiz = true; // Show the quiz after countdown reaches 0
         }
       }, 1000);
     },
     selectOption(index) {
-      // Handle the selected option
+      this.selectedOptionIndex = index; // Track the selected option
       const selectedOption = this.currentQuestion.options[index];
       console.log(`Вы выбрали: ${selectedOption}`);
       // Proceed to the next step, such as navigating to another page or showing the next question
-      // For example:
-      // this.$router.push('/next-question');
+      // Example:
+      // this.$router.push('/thank-you');
     },
   },
 };
@@ -94,6 +100,8 @@ export default {
   height: 100%;
   padding: 0 20px;
   text-align: center;
+  position: relative; /* Added for z-index management */
+  z-index: 1; /* Ensure it's above .sparkles */
 }
 
 .countdown-number {
@@ -153,6 +161,11 @@ export default {
   background-color: #ffffff;
 }
 
+.quiz-button.selected { /* Highlight selected option */
+  background-color: #355d87;
+  color: #ffffff;
+}
+
 .sparkles {
   position: absolute;
   top: -50%;
@@ -161,6 +174,8 @@ export default {
   height: 200%;
   background-image: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.3), transparent 70%);
   animation: rotate 60s linear infinite;
+  pointer-events: none; /* Prevent .sparkles from intercepting clicks */
+  z-index: 0; /* Ensure it's below .countdown-container */
 }
 
 @keyframes pulse {
@@ -186,6 +201,15 @@ export default {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }
 

@@ -33,7 +33,6 @@
 
       <!-- Final Message -->
       <div v-else class="countdown-message">
-        <p>Спасибо за участие!</p>
       </div>
     </div>
     <div class="sparkles"></div>

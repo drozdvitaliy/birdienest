@@ -5,7 +5,13 @@
       <p>👥 Введите юзернэйм вашего партнёра, чтобы начать ваше совместное путешествие:</p>
       
       <!-- Поле для ввода юзернэйма партнёра -->
-      <input type="text" v-model="partnerUsername" placeholder="@username" />
+      <input
+        ref="partnerInput"
+        type="text"
+        v-model="partnerUsername"
+        placeholder="@username"
+        @keyup.enter="startGame" 
+      />
       
       <!-- Кнопка запуска игры -->
       <button @click="startGame">Начать игру 💖</button>
@@ -41,6 +47,9 @@ export default {
     },
     
     async startGame() {
+      // Dismiss the keyboard by blurring the input
+      this.$refs.partnerInput.blur();
+
       if (!this.partnerUsername.startsWith('@')) {
         this.errorMessage = 'Юзернэйм должен начинаться с @.';
         return;
@@ -55,7 +64,7 @@ export default {
         const response = await fetch('https://udaejtcmj5.execute-api.eu-west-2.amazonaws.com/main/gamecreation', {
           method: 'POST',
           body: JSON.stringify({
-            username: this.username,              // Юзернэйм текущего пользователя
+            username: this.username,               // Юзернэйм текущего пользователя
             partnerUsername: this.partnerUsername, // Юзернэйм партнёра
           }),
           headers: {
@@ -88,6 +97,7 @@ export default {
   },
 };
 </script>
+
 
 
 

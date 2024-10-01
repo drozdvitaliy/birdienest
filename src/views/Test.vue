@@ -1,11 +1,26 @@
 <template>
   <div class="countdown-background">
     <div class="countdown-container">
-      <div v-if="count > 0" class="countdown-number">
+      <!-- Countdown Display -->
+      <div v-if="count > 1" class="countdown-number">
         {{ count }}
       </div>
+
+      <!-- Quiz Display -->
+      <div v-else-if="showQuiz" class="quiz-container">
+        <h2 class="quiz-question">{{ currentQuestion.question }}</h2>
+        <ul class="quiz-options">
+          <li v-for="(option, index) in currentQuestion.options" :key="index">
+            <button @click="selectOption(index)" class="quiz-button">
+              {{ option }}
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Final Message -->
       <div v-else class="countdown-message">
-        <h1>✨ Пусть начнётся магия! ✨</h1>
+        <!-- <h1>✨ Пусть начнётся магия! ✨</h1> -->
       </div>
     </div>
     <div class="sparkles"></div>
@@ -19,6 +34,16 @@ export default {
     return {
       count: 5,
       countdownInterval: null,
+      showQuiz: false,
+      currentQuestion: {
+        question: 'Что ты ценишь больше всего в нашем общении?',
+        options: [
+          'Открытость и честность ',
+          'Общие интересы и хобби',
+          'Поддержку и понимание',
+          'Совместное чувство юмора',
+        ],
+      },
     };
   },
   mounted() {
@@ -35,11 +60,17 @@ export default {
         } else {
           clearInterval(this.countdownInterval);
           this.count = 0;
-          // Trigger any action after countdown finishes
-          // For example, navigate to the next page:
-          // this.$router.push('/next-page');
+          this.showQuiz = true; // Show the quiz after countdown reaches 1
         }
-      }, 1000);
+      }, 1);
+    },
+    selectOption(index) {
+      // Handle the selected option
+      const selectedOption = this.currentQuestion.options[index];
+      console.log(`Вы выбрали: ${selectedOption}`);
+      // Proceed to the next step, such as navigating to another page or showing the next question
+      // For example:
+      // this.$router.push('/next-question');
     },
   },
 };
@@ -61,20 +92,65 @@ export default {
   align-items: center;
   justify-content: center;
   height: 100%;
+  padding: 0 20px;
+  text-align: center;
 }
 
 .countdown-number {
   font-family: 'Great Vibes', cursive;
-  font-size: 10px;
+  font-size: 160px;
   color: #ffffff;
   animation: pulse 1s infinite;
 }
 
 .countdown-message h1 {
   font-family: 'Great Vibes', cursive;
-  font-size: 200px;
+  font-size: 64px;
   color: #ffffff;
   animation: fadeIn 2s forwards;
+}
+
+.quiz-container {
+  background-color: rgba(0, 0, 0, 0.6); /* Dark semi-transparent background */
+  border-radius: 15px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+  animation: fadeIn 1s forwards;
+}
+
+.quiz-question {
+  font-family: 'Great Vibes', cursive;
+  /* font-family: 'Quicksand', sans-serif; */
+  font-size: 36px;
+  color: #ffffff;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.quiz-options {
+  list-style: none;
+  padding: 0;
+}
+
+.quiz-options li {
+  margin-bottom: 16px;
+}
+
+.quiz-button {
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #355d87;
+  padding: 14px 28px;
+  font-size: 18px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: 'Great Vibes', cursive;
+  transition: background-color 0.3s ease;
+  width: 100%;
+  max-width: 300px;
+}
+
+.quiz-button:hover {
+  background-color: #ffffff;
 }
 
 .sparkles {
@@ -113,22 +189,20 @@ export default {
   }
 }
 
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* Responsive adjustments */
 @media (max-width: 600px) {
   .countdown-number {
-    font-size: 300px;
+    font-size: 120px;
   }
   .countdown-message h1 {
-    font-size: 50px;
+    font-size: 48px;
+  }
+  .quiz-question {
+    font-size: 36px;
+  }
+  .quiz-button {
+    font-size: 24px;
+    font-weight: 100;
   }
 }
 </style>

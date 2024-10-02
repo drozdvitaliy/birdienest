@@ -19,16 +19,13 @@
             <button 
               @click="selectOption(index)" 
               class="quiz-button"
-              :class="{ selected: selectedOptionIndex === index }" 
-              :disabled="selectedOptionIndex !== null" 
+              :class="getButtonClasses(index)"
+              :disabled="selectedOptionIndex !== null || opponentAnswerIndex !== null || isReconnecting"
             >
               {{ option }}
             </button>
           </li>
         </ul>
-        <div v-if="opponentAnswer" class="opponent-response">
-          <p>Opponent's Answer: {{ opponentAnswer }}</p>
-        </div>
       </div>
 
       <!-- Final Message -->
@@ -36,12 +33,26 @@
       </div>
     </div>
     <div class="sparkles"></div>
+    <!-- Confetti Component -->
+    <Confetti ref="confetti" />
+    
+    <!-- Connection Status Overlay -->
+    <div v-if="isReconnecting" class="connection-overlay">
+      <div class="overlay-content">
+        <p>Connection lost. Attempting to reconnect...</p>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import Confetti from './Confetti.vue'; // Adjust the path as necessary
+
 export default {
   name: 'MagicCountdown',
+  components: {
+    Confetti,
+  },
   data() {
     return {
       count: 5,
@@ -50,11 +61,17 @@ export default {
       waitingForOpponent: false,
       currentQuestion: {},
       selectedOptionIndex: null,
-      opponentAnswer: null,
+      opponentAnswerIndex: null, // Tracks opponent's selected option index
       websocket: null,
       sessionId: null,
       gameId: null,
       username: null,
+      isConfettiLaunched: false, // Prevent multiple confetti launches
+      // Reconnection properties
+      reconnectAttempts: 0,
+      maxReconnectAttempts: 5,
+      reconnectInterval: 2000, // Start with 2 seconds
+      isReconnecting: false,
     };
   },
   mounted() {
@@ -96,7 +113,12 @@ export default {
 
       this.websocket.onopen = () => {
         console.log('WebSocket connection established.');
-        // Optionally, you can send a greeting message or perform other actions
+        this.isReconnecting = false;
+        this.reconnectAttempts = 0;
+        // If the quiz is already showing, ensure the user rejoins
+        if (this.showQuiz) {
+          this.joinGame();
+        }
       };
 
       this.websocket.onmessage = (event) => {
@@ -106,13 +128,28 @@ export default {
 
       this.websocket.onerror = (error) => {
         console.error('WebSocket error:', error);
-        alert('WebSocket encountered an error. Please try again later.');
+        // Errors are also handled by onclose
       };
 
-      this.websocket.onclose = () => {
-        console.log('WebSocket connection closed.');
-        // Optionally, notify the user or attempt to reconnect
+      this.websocket.onclose = (event) => {
+        console.log('WebSocket connection closed:', event.reason);
+        if (!this.isReconnecting && this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.attemptReconnection();
+        } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+          alert('Unable to reconnect to the game. Please refresh the page or try again later.');
+        }
       };
+    },
+    attemptReconnection() {
+      this.isReconnecting = true;
+      this.reconnectAttempts++;
+      const delay = this.reconnectInterval * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
+
+      console.log(`Reconnection attempt ${this.reconnectAttempts} in ${delay / 1000} seconds...`);
+
+      setTimeout(() => {
+        this.initWebSocket();
+      }, delay);
     },
     joinGame() {
       if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
@@ -128,6 +165,10 @@ export default {
         this.waitingForOpponent = true;
       } else {
         console.error('WebSocket is not open. Cannot join game.');
+        // Optionally, initiate reconnection if not already attempting
+        if (!this.isReconnecting && this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.attemptReconnection();
+        }
       }
     },
     handleWebSocketMessage(message) {
@@ -149,12 +190,21 @@ export default {
             options: message.data.options,
           };
           this.showQuiz = true;
-          this.opponentAnswer = null; // Reset opponent's answer for new question
+          this.selectedOptionIndex = null;
+          this.opponentAnswerIndex = null; // Reset opponent's answer for new question
+          this.isConfettiLaunched = false; // Reset confetti launch flag
           console.log('Received question:', this.currentQuestion);
           break;
         case 'opponent_answer':
-          this.opponentAnswer = message.data.answer;
-          console.log('Received opponent\'s answer:', this.opponentAnswer);
+          const opponentAnswer = message.data.answer;
+          const opponentIndex = this.currentQuestion.options.indexOf(opponentAnswer);
+          if (opponentIndex !== -1) {
+            this.opponentAnswerIndex = opponentIndex;
+            console.log(`Opponent selected option index: ${opponentIndex}`);
+            this.checkForMatchingAnswers();
+          } else {
+            console.warn('Opponent selected an invalid option.');
+          }
           break;
         case 'opponent_disconnected':
           alert('Your opponent has disconnected.');
@@ -184,7 +234,7 @@ export default {
       }
     },
     selectOption(index) {
-      if (this.selectedOptionIndex !== null) return; // Prevent multiple selections
+      if (this.selectedOptionIndex !== null || this.opponentAnswerIndex !== null) return; // Prevent multiple selections
 
       this.selectedOptionIndex = index; // Track the selected option
       const selectedOption = this.currentQuestion.options[index];
@@ -205,9 +255,33 @@ export default {
       this.showQuiz = false;
       this.currentQuestion = {};
       this.selectedOptionIndex = null;
-      this.opponentAnswer = null;
+      this.opponentAnswerIndex = null;
       this.waitingForOpponent = false;
+      this.isConfettiLaunched = false;
+      this.isReconnecting = false;
+      this.reconnectAttempts = 0;
       // Optionally, reset the countdown or navigate away
+      this.startCountdown();
+      this.initWebSocket();
+    },
+    getButtonClasses(index) {
+      return {
+        selected: this.selectedOptionIndex === index,
+        'opponent-selected': this.opponentAnswerIndex === index && this.selectedOptionIndex !== index,
+        'matched': this.selectedOptionIndex === index && this.opponentAnswerIndex === index
+      };
+    },
+    checkForMatchingAnswers() {
+      if (this.selectedOptionIndex === this.opponentAnswerIndex && this.selectedOptionIndex !== null) {
+        // Both users selected the same option
+        this.launchConfetti();
+      }
+    },
+    launchConfetti() {
+      if (this.isConfettiLaunched) return; // Prevent multiple confetti launches
+      this.isConfettiLaunched = true;
+      this.$refs.confetti.launchConfetti();
+      console.log('Confetti launched for matching answers!');
     }
   },
 };
@@ -292,7 +366,7 @@ export default {
   border-radius: 12px;
   cursor: pointer;
   font-family: 'Great Vibes', cursive;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s ease, color 0.3s ease;
   width: 100%;
   max-width: 300px;
 }
@@ -303,6 +377,16 @@ export default {
 
 .quiz-button.selected { /* Highlight selected option */
   background-color: #355d87;
+  color: #ffffff;
+}
+
+.quiz-button.opponent-selected { /* Highlight opponent's selected option */
+  background-color: #d87e97;
+  color: #ffffff;
+}
+
+.quiz-button.matched { /* Highlight matched option with gradient */
+  background: linear-gradient(45deg, #355d87, #d87e97);
   color: #ffffff;
 }
 
@@ -323,6 +407,29 @@ export default {
   animation: rotate 60s linear infinite;
   pointer-events: none; /* Prevent .sparkles from intercepting clicks */
   z-index: 0; /* Ensure it's below .countdown-container */
+}
+
+.connection-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.overlay-content {
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 20px 40px;
+  border-radius: 10px;
+  font-family: 'Quicksand', sans-serif;
+  color: #355d87;
+  font-size: 18px;
+  text-align: center;
 }
 
 @keyframes pulse {

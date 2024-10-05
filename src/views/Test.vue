@@ -8,7 +8,7 @@
 
       <!-- Waiting for Opponent -->
       <div v-else-if="waitingForOpponent" class="waiting-container">
-        <h2 class="waiting-message">Waiting for opponent to join...</h2>
+        <h2 class="waiting-message">Waiting for partner to join...</h2>
       </div>
 
       <!-- Quiz Display -->
@@ -182,7 +182,7 @@ export default {
           break;
         case 'waiting_for_opponent':
           this.waitingForOpponent = true;
-          console.log('Waiting for opponent to join...');
+          console.log('Waiting for partner to join...');
           break;
         case 'question':
           this.currentQuestion = {
@@ -476,10 +476,10 @@ export default {
     font-size: 18px;
   }
   .quiz-question {
-    font-size: 24px;
+    font-size: 28px;
   }
   .quiz-button {
-    font-size: 16px;
+    font-size: 20px;
     padding: 10px 20px;
   }
 }

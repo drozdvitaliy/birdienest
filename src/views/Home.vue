@@ -96,7 +96,7 @@ export default {
 
           // Перенаправляем пользователя в зависимости от статуса
           if (status === 'waiting') {
-            this.$router.push(`/waiting?gameId=${gameId}`);
+            this.$router.push(`/test?gameId=${gameId}`);
           } else if (status === 'ready') {
             this.$router.push(`/test?gameId=${gameId}`);
           }

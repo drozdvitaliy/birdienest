@@ -20,12 +20,26 @@
               @click="selectOption(index)" 
               class="quiz-button"
               :class="getButtonClasses(index)"
-              :disabled="selectedOptionIndex !== null || opponentAnswerIndex !== null || isReconnecting"
+              :disabled="selectedOptionIndex !== null || isReconnecting"
             >
               {{ option }}
             </button>
           </li>
         </ul>
+        <!-- Next Question Button -->
+        <button 
+          v-if="showNextButton" 
+          @click="goToNextQuestion" 
+          class="next-question-button"
+          :disabled="nextButtonPressed"
+        >
+          Далее
+        </button>
+      </div>
+
+      <!-- Waiting for Opponent to Press "Далее" -->
+      <div v-else-if="waitingForOpponentNext" class="waiting-container">
+        <h2 class="waiting-message">Waiting for your partner to press "Далее"...</h2>
       </div>
 
       <!-- Final Message -->
@@ -72,6 +86,14 @@ export default {
       maxReconnectAttempts: 5,
       reconnectInterval: 2000, // Start with 2 seconds
       isReconnecting: false,
+      // New properties
+      showNextButton: false,
+      nextButtonPressed: false, // To prevent multiple presses
+      startTime: null, // For tracking question start time
+      userHasPressedNext: false, // Track if user pressed "Next"
+      opponentHasPressedNext: false, // Track if opponent pressed "Next"
+      lambdaInvoked: false, // Prevent multiple Lambda invocations
+      waitingForOpponentNext: false, // Track if waiting for opponent after pressing "Next"
     };
   },
   mounted() {
@@ -157,8 +179,8 @@ export default {
           action: 'join_game',
           data: {
             gameId: this.gameId,
-            username: this.username
-          }
+            username: this.username,
+          },
         };
         this.websocket.send(JSON.stringify(payload));
         console.log(`Sent join_game for gameId: ${this.gameId}, username: ${this.username}`);
@@ -193,6 +215,13 @@ export default {
           this.selectedOptionIndex = null;
           this.opponentAnswerIndex = null; // Reset opponent's answer for new question
           this.isConfettiLaunched = false; // Reset confetti launch flag
+          this.showNextButton = false; // Reset next button visibility
+          this.nextButtonPressed = false; // Reset button pressed flag
+          this.startTime = Date.now(); // Record start time
+          this.userHasPressedNext = false;
+          this.opponentHasPressedNext = false;
+          this.lambdaInvoked = false;
+          this.waitingForOpponentNext = false;
           console.log('Received question:', this.currentQuestion);
           break;
         case 'opponent_answer':
@@ -201,19 +230,39 @@ export default {
           if (opponentIndex !== -1) {
             this.opponentAnswerIndex = opponentIndex;
             console.log(`Opponent selected option index: ${opponentIndex}`);
+            // Check if user has already answered
+            if (this.selectedOptionIndex !== null) {
+              this.showNextButton = true;
+            }
             this.checkForMatchingAnswers();
           } else {
             console.warn('Opponent selected an invalid option.');
           }
           break;
-        case 'opponent_disconnected':
-          alert('Your opponent has disconnected.');
-          // Optionally, reset the quiz state or redirect the user
-          this.resetQuiz();
+        case 'opponent_next_pressed':
+          this.opponentHasPressedNext = true;
+          console.log('Opponent has pressed "Далее".');
+          this.hideQuizAndWait();
+          this.checkBothNextPressed();
+          break;
+        case 'next_question_ready':
+          // Server indicates next question is ready
+          this.requestQuestion();
+          break;
+        case 'update_connection':
+          // Server sends updated connection level
+          const updatedCL = message.data.connectionLevel;
+          console.log(`Connection Level updated to: ${updatedCL}`);
+          // Optionally, update a display or state
           break;
         case 'error':
           console.error('Error from server:', message.data.message);
           alert(`Error: ${message.data.message}`);
+          break;
+        case 'opponent_disconnected':
+          alert('Your opponent has disconnected.');
+          // Optionally, reset the quiz state or redirect the user
+          this.resetQuiz();
           break;
         default:
           console.warn('Unknown action:', message.action);
@@ -224,8 +273,8 @@ export default {
         const payload = {
           action: 'send_question',
           data: {
-            gameId: this.gameId
-          }
+            gameId: this.gameId,
+          },
         };
         this.websocket.send(JSON.stringify(payload));
         console.log('Requested question for gameId:', this.gameId);
@@ -234,7 +283,7 @@ export default {
       }
     },
     selectOption(index) {
-      if (this.selectedOptionIndex !== null || this.opponentAnswerIndex !== null) return; // Prevent multiple selections
+      if (this.selectedOptionIndex !== null) return; // Prevent multiple selections
 
       this.selectedOptionIndex = index; // Track the selected option
       const selectedOption = this.currentQuestion.options[index];
@@ -250,6 +299,11 @@ export default {
       };
       this.websocket.send(JSON.stringify(payload));
       console.log('Sent answer to backend.');
+
+      // Check if opponent has already answered
+      if (this.opponentAnswerIndex !== null) {
+        this.showNextButton = true;
+      }
     },
     resetQuiz() {
       this.showQuiz = false;
@@ -260,6 +314,13 @@ export default {
       this.isConfettiLaunched = false;
       this.isReconnecting = false;
       this.reconnectAttempts = 0;
+      this.showNextButton = false;
+      this.nextButtonPressed = false;
+      this.startTime = null;
+      this.userHasPressedNext = false;
+      this.opponentHasPressedNext = false;
+      this.lambdaInvoked = false;
+      this.waitingForOpponentNext = false;
       // Optionally, reset the countdown or navigate away
       this.startCountdown();
       this.initWebSocket();
@@ -268,13 +329,15 @@ export default {
       return {
         selected: this.selectedOptionIndex === index,
         'opponent-selected': this.opponentAnswerIndex === index && this.selectedOptionIndex !== index,
-        'matched': this.selectedOptionIndex === index && this.opponentAnswerIndex === index
+        matched: this.selectedOptionIndex === index && this.opponentAnswerIndex === index,
       };
     },
     checkForMatchingAnswers() {
       if (this.selectedOptionIndex === this.opponentAnswerIndex && this.selectedOptionIndex !== null) {
         // Both users selected the same option
         this.launchConfetti();
+        // Call Lambda function to log the match
+        this.logMatchingAnswers();
       }
     },
     launchConfetti() {
@@ -282,16 +345,92 @@ export default {
       this.isConfettiLaunched = true;
       this.$refs.confetti.launchConfetti();
       console.log('Confetti launched for matching answers!');
-    }
+    },
+    goToNextQuestion() {
+      if (this.nextButtonPressed) return; // Prevent multiple presses
+      this.nextButtonPressed = true; // Mark as pressed
+      this.userHasPressedNext = true; // Track that user has pressed "Далее"
+
+      // Hide the quiz UI and show waiting message
+      this.hideQuizAndWait();
+
+      const endTime = Date.now();
+      const timeSpent = (endTime - this.startTime) / 1000; // Time in seconds
+      console.log(`Time spent on question: ${timeSpent} seconds`);
+
+      // Prepare data to send to the backend via WebSocket
+      const payload = {
+        action: 'user_next_pressed',
+        data: {
+          gameId: this.gameId,
+          username: this.username,
+        },
+      };
+
+      // Send data to the backend via WebSocket
+      this.websocket.send(JSON.stringify(payload));
+      console.log('Sent user_next_pressed payload to backend.');
+
+      // Check if opponent has already pressed "Далее"
+      if (this.opponentHasPressedNext) {
+        this.invokeLambdaIfNotInvoked();
+      }
+    },
+    hideQuizAndWait() {
+      this.showQuiz = false;
+      this.waitingForOpponentNext = true;
+    },
+    handleOpponentNextPressed() {
+      this.opponentHasPressedNext = true;
+      // Hide the quiz UI and show waiting message
+      this.hideQuizAndWait();
+      this.checkBothNextPressed();
+    },
+    checkBothNextPressed() {
+      if (this.userHasPressedNext && this.opponentHasPressedNext) {
+        this.invokeLambdaIfNotInvoked();
+      }
+    },
+    invokeLambdaIfNotInvoked() {
+      if (this.lambdaInvoked) return; // Prevent multiple invocations
+      this.lambdaInvoked = true;
+      this.logMatchingAnswers();
+    },
+    logMatchingAnswers() {
+      // Define your API Gateway endpoint that triggers the Lambda function
+      const apiEndpoint = 'https://udaejtcmj5.execute-api.eu-west-2.amazonaws.com/main/log-match'; // Replace with your actual endpoint
+
+      const payload = {
+        gameId: this.gameId,
+      };
+
+      fetch(apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        console.log('Successfully logged matching answers to Lambda.');
+      })
+      .catch(error => {
+        console.error('Error logging matching answers:', error);
+      });
+    },
   },
 };
 </script>
+
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Quicksand:wght@400;600&display=swap');
 
 .countdown-background {
-  /* background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); */
   position: relative;
   height: 100vh;
   overflow: hidden;
@@ -337,14 +476,13 @@ export default {
   border-radius: 15px;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
   animation: fadeIn 1s forwards;
+  padding: 20px;
 }
 
 .quiz-question {
   font-family: 'Great Vibes', cursive;
-  /* font-family: 'Quicksand', sans-serif; */
   font-size: 36px;
   color: #ffffff;
-  padding: 20px;
   margin-bottom: 24px;
 }
 
@@ -375,26 +513,50 @@ export default {
   background-color: #ffffff;
 }
 
-.quiz-button.selected { /* Highlight selected option */
+.quiz-button.selected {
   background-color: #355d87;
   color: #ffffff;
 }
 
-.quiz-button.opponent-selected { /* Highlight opponent's selected option */
+.quiz-button.opponent-selected {
   background-color: #d87e97;
   color: #ffffff;
 }
 
-.quiz-button.matched { /* Highlight matched option with gradient */
+.quiz-button.matched {
   background: linear-gradient(45deg, #355d87, #d87e97);
   color: #ffffff;
 }
 
-.opponent-response {
-  margin-top: 20px;
-  font-family: 'Quicksand', sans-serif;
-  font-size: 18px;
+.next-question-button {
+  background: #355d87;
   color: #ffffff;
+  padding: 10px 20px;
+  font-size: 20px;
+  font-weight: bold;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: 'Quicksand', sans-serif;
+  transition: transform 0.2s ease, box-shadow 0.3s ease, background 0.3s ease;
+  margin-top: 30px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.next-question-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg, #c76d88, #2c4e6a);
+}
+
+.next-question-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+}
+
+.next-question-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(216, 126, 151, 0.5);
 }
 
 .sparkles {

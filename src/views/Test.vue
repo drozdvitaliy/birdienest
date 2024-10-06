@@ -246,9 +246,21 @@ export default {
           // this.checkBothNextPressed();
           break;
         case 'next_question_ready':
+          // Extract the username from the message
+          const receivedUsername = message.data.message;
+          console.log(receivedUsername);
+
+          // Compare with the current user's username
+          if (receivedUsername === this.username) {
+            // Execute the desired function
+            this.requestQuestion();
+            console.log('Usernames match. Proceeding to the next question.');
+          } else {
+            console.log('Usernames do not match. No action taken.');
+          }
           // Server indicates next question is ready
-          this.resetQuestion();
-          this.requestQuestion();
+          // this.resetQuestion();
+          // this.requestQuestion();
           break;
         case 'update_connection':
           // Server sends updated connection level
@@ -326,26 +338,6 @@ export default {
       // Optionally, reset the countdown or navigate away
       this.startCountdown();
       this.initWebSocket();
-    },
-    resetQuestion() {
-      this.showQuiz = false;
-      this.currentQuestion = {};
-      this.selectedOptionIndex = null;
-      this.opponentAnswerIndex = null;
-      this.waitingForOpponent = false;
-      this.isConfettiLaunched = false;
-      this.isReconnecting = false;
-      this.reconnectAttempts = 0;
-      this.showNextButton = false;
-      this.nextButtonPressed = false;
-      this.startTime = null;
-      this.userHasPressedNext = false;
-      this.opponentHasPressedNext = false;
-      this.lambdaInvoked = false;
-      this.waitingForOpponentNext = false;
-      this.matchingresponses = false;
-      // Optionally, reset the countdown or navigate away
-      this.startCountdown();
     },
     getButtonClasses(index) {
       return {

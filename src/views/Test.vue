@@ -240,13 +240,14 @@ export default {
           }
           break;
         case 'opponent_next_pressed':
-          this.opponentHasPressedNext = true;
-          console.log('Opponent has pressed "Далее".');
-          this.hideQuizAndWait();
-          this.checkBothNextPressed();
+          // this.opponentHasPressedNext = true;
+          // console.log('Opponent has pressed "Далее".');
+          // this.hideQuizAndWait();
+          // this.checkBothNextPressed();
           break;
         case 'next_question_ready':
           // Server indicates next question is ready
+          this.resetQuestion();
           this.requestQuestion();
           break;
         case 'update_connection':
@@ -321,9 +322,30 @@ export default {
       this.opponentHasPressedNext = false;
       this.lambdaInvoked = false;
       this.waitingForOpponentNext = false;
+      this.matchingresponses = false;
       // Optionally, reset the countdown or navigate away
       this.startCountdown();
       this.initWebSocket();
+    },
+    resetQuestion() {
+      this.showQuiz = false;
+      this.currentQuestion = {};
+      this.selectedOptionIndex = null;
+      this.opponentAnswerIndex = null;
+      this.waitingForOpponent = false;
+      this.isConfettiLaunched = false;
+      this.isReconnecting = false;
+      this.reconnectAttempts = 0;
+      this.showNextButton = false;
+      this.nextButtonPressed = false;
+      this.startTime = null;
+      this.userHasPressedNext = false;
+      this.opponentHasPressedNext = false;
+      this.lambdaInvoked = false;
+      this.waitingForOpponentNext = false;
+      this.matchingresponses = false;
+      // Optionally, reset the countdown or navigate away
+      this.startCountdown();
     },
     getButtonClasses(index) {
       return {
@@ -337,7 +359,8 @@ export default {
         // Both users selected the same option
         this.launchConfetti();
         // Call Lambda function to log the match
-        this.logMatchingAnswers();
+        // this.logMatchingAnswers();
+        this.matchingresponses = true;
       }
     },
     launchConfetti() {
@@ -351,12 +374,13 @@ export default {
       this.nextButtonPressed = true; // Mark as pressed
       this.userHasPressedNext = true; // Track that user has pressed "Далее"
 
-      // Hide the quiz UI and show waiting message
-      this.hideQuizAndWait();
-
+      // Calculate time spent on the question
       const endTime = Date.now();
       const timeSpent = (endTime - this.startTime) / 1000; // Time in seconds
       console.log(`Time spent on question: ${timeSpent} seconds`);
+
+      // Hide the quiz UI and show waiting message
+      this.hideQuizAndWait();
 
       // Prepare data to send to the backend via WebSocket
       const payload = {
@@ -364,62 +388,19 @@ export default {
         data: {
           gameId: this.gameId,
           username: this.username,
+          timeSpent: timeSpent, // Include timeSpent in the payload
+          matchingresponses: this.matchingresponses,
         },
       };
 
       // Send data to the backend via WebSocket
       this.websocket.send(JSON.stringify(payload));
       console.log('Sent user_next_pressed payload to backend.');
-
-      // Check if opponent has already pressed "Далее"
-      if (this.opponentHasPressedNext) {
-        this.invokeLambdaIfNotInvoked();
-      }
     },
+
     hideQuizAndWait() {
       this.showQuiz = false;
       this.waitingForOpponentNext = true;
-    },
-    handleOpponentNextPressed() {
-      this.opponentHasPressedNext = true;
-      // Hide the quiz UI and show waiting message
-      this.hideQuizAndWait();
-      this.checkBothNextPressed();
-    },
-    checkBothNextPressed() {
-      if (this.userHasPressedNext && this.opponentHasPressedNext) {
-        this.invokeLambdaIfNotInvoked();
-      }
-    },
-    invokeLambdaIfNotInvoked() {
-      if (this.lambdaInvoked) return; // Prevent multiple invocations
-      this.lambdaInvoked = true;
-      this.logMatchingAnswers();
-    },
-    logMatchingAnswers() {
-      // Define your API Gateway endpoint that triggers the Lambda function
-      const apiEndpoint = 'https://udaejtcmj5.execute-api.eu-west-2.amazonaws.com/main/log-match'; // Replace with your actual endpoint
-
-      const payload = {
-        gameId: this.gameId,
-      };
-
-      fetch(apiEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        console.log('Successfully logged matching answers to Lambda.');
-      })
-      .catch(error => {
-        console.error('Error logging matching answers:', error);
-      });
     },
   },
 };

@@ -222,6 +222,7 @@ export default {
           this.opponentHasPressedNext = false;
           this.lambdaInvoked = false;
           this.waitingForOpponentNext = false;
+          this.matchingresponses = false;
           console.log('Received question:', this.currentQuestion);
           break;
         case 'opponent_answer':

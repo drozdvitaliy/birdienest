@@ -37,6 +37,28 @@
         </button>
       </div>
 
+      <!-- Action Display -->
+      <div v-else-if="showAction" class="quiz-container">
+        <!-- Action Label -->
+        <div class="action-header">
+          <h3 class="action-label">⚡ Действие:</h3>
+        </div>
+        
+        <!-- Action Content -->
+        <h2 class="quiz-question">{{ currentAction.action }}</h2>
+        
+        <!-- Next Question Button -->
+        <button 
+          v-if="showNextButton" 
+          @click="goToNextQuestion" 
+          class="next-question-button"
+          :disabled="nextButtonPressed"
+        >
+          Далее
+        </button>
+      </div>
+
+
       <!-- Waiting for Opponent to Press "Далее" -->
       <div v-else-if="waitingForOpponentNext" class="waiting-container">
         <h2 class="waiting-message">Waiting for your partner to press "Далее"...</h2>
@@ -72,8 +94,10 @@ export default {
       count: 5,
       countdownInterval: null,
       showQuiz: false,
+      showAction: false,
       waitingForOpponent: false,
       currentQuestion: {},
+      currentAction: {},
       selectedOptionIndex: null,
       opponentAnswerIndex: null, // Tracks opponent's selected option index
       websocket: null,
@@ -144,8 +168,12 @@ export default {
       };
 
       this.websocket.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        this.handleWebSocketMessage(message);
+        try {
+          const message = JSON.parse(event.data);
+          this.handleWebSocketMessage(message);
+        } catch (error) {
+          console.error('Failed to parse WebSocket message:', event.data);
+        }
       };
 
       this.websocket.onerror = (error) => {
@@ -194,6 +222,8 @@ export default {
       }
     },
     handleWebSocketMessage(message) {
+      console.log('Received message:', message); // Add a general log for all messages
+
       switch (message.action) {
         case 'session_start':
           this.sessionId = message.data.gameId;
@@ -212,6 +242,7 @@ export default {
             options: message.data.options,
           };
           this.showQuiz = true;
+          this.showAction = false;
           this.selectedOptionIndex = null;
           this.opponentAnswerIndex = null; // Reset opponent's answer for new question
           this.isConfettiLaunched = false; // Reset confetti launch flag
@@ -222,8 +253,28 @@ export default {
           this.opponentHasPressedNext = false;
           this.lambdaInvoked = false;
           this.waitingForOpponentNext = false;
-          this.matchingresponses = false;
           console.log('Received question:', this.currentQuestion);
+          break;
+        case 'action':
+          // **Updated Code Starts Here**
+          // Since message.data is a string ("Текст действия"), assign it directly
+          this.currentAction = {
+            action: message.data, // Changed from message.data.action to message.data
+          };
+          // **Updated Code Ends Here**
+
+          this.showQuiz = false;
+          this.showAction = true;
+          this.selectedOptionIndex = null;
+          this.opponentAnswerIndex = null; // Reset opponent's answer for new action
+          this.isConfettiLaunched = false; // Reset confetti launch flag
+          this.showNextButton = true; // Show the "Далее" button
+          this.nextButtonPressed = false; // Reset button pressed flag
+          this.startTime = Date.now(); // Record start time
+          this.userHasPressedNext = false;
+          this.opponentHasPressedNext = false;
+          this.waitingForOpponentNext = false;
+          console.log('Received action:', this.currentAction.action);
           break;
         case 'opponent_answer':
           const opponentAnswer = message.data.answer;
@@ -241,15 +292,19 @@ export default {
           }
           break;
         case 'opponent_next_pressed':
-          // this.opponentHasPressedNext = true;
-          // console.log('Opponent has pressed "Далее".');
-          // this.hideQuizAndWait();
-          // this.checkBothNextPressed();
+          // Handle opponent pressing "Далее" if necessary
+          // Uncomment and implement if needed
+          /*
+          this.opponentHasPressedNext = true;
+          console.log('Opponent has pressed "Далее".');
+          this.hideQuizAndWait();
+          this.checkBothNextPressed();
+          */
           break;
         case 'next_question_ready':
           // Extract the username from the message
           const receivedUsername = message.data.message;
-          console.log(receivedUsername);
+          console.log(`Received next_question_ready for username: ${receivedUsername}`);
 
           // Compare with the current user's username
           if (receivedUsername === this.username) {
@@ -259,9 +314,6 @@ export default {
           } else {
             console.log('Usernames do not match. No action taken.');
           }
-          // Server indicates next question is ready
-          // this.resetQuestion();
-          // this.requestQuestion();
           break;
         case 'update_connection':
           // Server sends updated connection level
@@ -321,7 +373,9 @@ export default {
     },
     resetQuiz() {
       this.showQuiz = false;
+      this.showAction = false; // Reset showAction as well
       this.currentQuestion = {};
+      this.currentAction = {}; // Reset currentAction
       this.selectedOptionIndex = null;
       this.opponentAnswerIndex = null;
       this.waitingForOpponent = false;
@@ -335,7 +389,6 @@ export default {
       this.opponentHasPressedNext = false;
       this.lambdaInvoked = false;
       this.waitingForOpponentNext = false;
-      this.matchingresponses = false;
       // Optionally, reset the countdown or navigate away
       this.startCountdown();
       this.initWebSocket();
@@ -393,13 +446,12 @@ export default {
 
     hideQuizAndWait() {
       this.showQuiz = false;
+      this.showAction = false; // Hide action display as well
       this.waitingForOpponentNext = true;
     },
   },
 };
 </script>
-
-
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Quicksand:wght@400;600&display=swap');
@@ -458,6 +510,15 @@ export default {
   font-size: 36px;
   color: #ffffff;
   margin-bottom: 24px;
+}
+
+.action-label {
+  font-family: 'Quicksand', sans-serif;
+  font-size: 24px;
+  color: #d87e97; /* A distinct color to differentiate from the question */
+  margin-bottom: 10px; /* Space between label and action content */
+  text-transform: uppercase; /* Optional: Makes the label uppercase */
+  letter-spacing: 1px; /* Optional: Adds spacing between letters */
 }
 
 .quiz-options {

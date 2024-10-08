@@ -8,24 +8,26 @@
 
       <!-- Waiting for Opponent -->
       <div v-else-if="waitingForOpponent" class="waiting-container">
-        <h2 class="waiting-message">Waiting for partner to join...</h2>
+        <h2 class="waiting-message">{{ $t('countdown.waitingForPartner') }}</h2>
       </div>
 
       <!-- Quiz Display -->
       <div v-else-if="showQuiz" class="quiz-container">
-        <h2 class="quiz-question">{{ currentQuestion.question }}</h2>
-        <ul class="quiz-options">
-          <li v-for="(option, index) in currentQuestion.options" :key="index">
-            <button 
-              @click="selectOption(index)" 
-              class="quiz-button"
-              :class="getButtonClasses(index)"
-              :disabled="selectedOptionIndex !== null || isReconnecting"
-            >
-              {{ option }}
-            </button>
-          </li>
-        </ul>
+        <div class="quiz-content">
+          <h2 class="quiz-question">{{ currentQuestion.question }}</h2>
+          <ul class="quiz-options">
+            <li v-for="(option, index) in currentQuestion.options" :key="index">
+              <button 
+                @click="selectOption(index)" 
+                class="quiz-button"
+                :class="getButtonClasses(index)"
+                :disabled="selectedOptionIndex !== null || isReconnecting"
+              >
+                {{ option }}
+              </button>
+            </li>
+          </ul>
+        </div>
         <!-- Next Question Button -->
         <button 
           v-if="showNextButton" 
@@ -33,7 +35,7 @@
           class="next-question-button"
           :disabled="nextButtonPressed"
         >
-          Далее
+          {{ $t('countdown.nextButton') }}
         </button>
       </div>
 
@@ -41,7 +43,7 @@
       <div v-else-if="showAction" class="quiz-container">
         <!-- Action Label -->
         <div class="action-header">
-          <h3 class="action-label">⚡ Действие:</h3>
+          <h3 class="action-label">{{ $t('countdown.actionLabel') }}</h3>
         </div>
         
         <!-- Action Content -->
@@ -54,14 +56,13 @@
           class="next-question-button"
           :disabled="nextButtonPressed"
         >
-          Далее
+          {{ $t('countdown.nextButton') }}
         </button>
       </div>
 
-
-      <!-- Waiting for Opponent to Press "Далее" -->
+      <!-- Waiting for Opponent to Press "Next" -->
       <div v-else-if="waitingForOpponentNext" class="waiting-container">
-        <h2 class="waiting-message">Waiting for your partner to press "Далее"...</h2>
+        <h2 class="waiting-message">{{ $t('countdown.waitingForPartnerNext') }}</h2>
       </div>
 
       <!-- Final Message -->
@@ -75,7 +76,7 @@
     <!-- Connection Status Overlay -->
     <div v-if="isReconnecting" class="connection-overlay">
       <div class="overlay-content">
-        <p>Connection lost. Attempting to reconnect...</p>
+        <p>{{ $t('countdown.connectionLost') }}</p>
       </div>
     </div>
   </div>
@@ -186,7 +187,7 @@ export default {
         if (!this.isReconnecting && this.reconnectAttempts < this.maxReconnectAttempts) {
           this.attemptReconnection();
         } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-          alert('Unable to reconnect to the game. Please refresh the page or try again later.');
+          alert(this.$t('countdown.connectionLost')); // Use translated text
         }
       };
     },
@@ -268,7 +269,7 @@ export default {
           this.selectedOptionIndex = null;
           this.opponentAnswerIndex = null; // Reset opponent's answer for new action
           this.isConfettiLaunched = false; // Reset confetti launch flag
-          this.showNextButton = true; // Show the "Далее" button
+          this.showNextButton = true; // Show the "Next" button
           this.nextButtonPressed = false; // Reset button pressed flag
           this.startTime = Date.now(); // Record start time
           this.userHasPressedNext = false;
@@ -276,6 +277,8 @@ export default {
           this.waitingForOpponentNext = false;
           console.log('Received action:', this.currentAction.action);
           break;
+
+
         case 'opponent_answer':
           const opponentAnswer = message.data.answer;
           const opponentIndex = this.currentQuestion.options.indexOf(opponentAnswer);
@@ -292,11 +295,11 @@ export default {
           }
           break;
         case 'opponent_next_pressed':
-          // Handle opponent pressing "Далее" if necessary
+          // Handle opponent pressing "Next" if necessary
           // Uncomment and implement if needed
           /*
           this.opponentHasPressedNext = true;
-          console.log('Opponent has pressed "Далее".');
+          console.log('Opponent has pressed "Next".');
           this.hideQuizAndWait();
           this.checkBothNextPressed();
           */
@@ -418,7 +421,7 @@ export default {
     goToNextQuestion() {
       if (this.nextButtonPressed) return; // Prevent multiple presses
       this.nextButtonPressed = true; // Mark as pressed
-      this.userHasPressedNext = true; // Track that user has pressed "Далее"
+      this.userHasPressedNext = true; // Track that user has pressed "Next"
 
       // Calculate time spent on the question
       const endTime = Date.now();
@@ -472,6 +475,10 @@ export default {
   text-align: center;
   position: relative; /* Added for z-index management */
   z-index: 1; /* Ensure it's above .sparkles */
+
+  /* Enable scrolling if content overflows */
+  max-height: 100vh;
+  overflow-y: auto;
 }
 
 .countdown-number {
@@ -503,6 +510,20 @@ export default {
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
   animation: fadeIn 1s forwards;
   padding: 20px;
+
+  /* Flex layout to separate content and button */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  /* Set maximum height and hide overflow to enable internal scrolling */
+  max-height: 80vh; /* Adjust as needed */
+  overflow: hidden; /* Hide overall overflow to manage scrolling within .quiz-content */
+}
+
+.quiz-content {
+  overflow-y: auto;
+  max-height: 70vh; /* Adjust to leave space for the "Next" button */
 }
 
 .quiz-question {
@@ -566,7 +587,7 @@ export default {
 .next-question-button {
   background: #355d87;
   color: #ffffff;
-  padding: 10px 20px;
+  padding: 10px 0px;
   font-size: 20px;
   font-weight: bold;
   border: none;
@@ -576,6 +597,8 @@ export default {
   transition: transform 0.2s ease, box-shadow 0.3s ease, background 0.3s ease;
   margin-top: 30px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 120px;
+  align-self: center;
 }
 
 .next-question-button:hover {

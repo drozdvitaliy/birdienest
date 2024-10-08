@@ -1,10 +1,18 @@
 <template>
   <div class="app-background" @click="handleGlobalClick">
+    <!-- Language Switcher Button -->
+    <div class="language-switcher-container" @click.stop>
+      <button class="language-switcher" @click="toggleLanguage">
+        {{ alternateLanguage }}
+      </button>
+    </div>
+
+    <!-- Start Screen -->
     <div class="start-screen" @click.stop>
-      <h1>🌸 Время лучше узнать друг друга!</h1>
-      <p>👥 Введите юзернэйм вашего партнёра, чтобы начать ваше совместное путешествие:</p>
+      <h1>{{ $t('title') }}</h1>
+      <p>{{ $t('description') }}</p>
       
-      <!-- Поле для ввода юзернэйма партнёра -->
+      <!-- Partner Username Input -->
       <input
         ref="partnerInput"
         type="text"
@@ -13,8 +21,8 @@
         @keyup.enter="startGame" 
       />
       
-      <!-- Кнопка запуска игры -->
-      <button @click="startGame">Начать игру 💖</button>
+      <!-- Start Game Button -->
+      <button @click="startGame">{{ $t('startGame') }}</button>
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     </div>
   </div>
@@ -24,21 +32,32 @@
 export default {
   data() {
     return {
-      username: '@Vitaliy_Drozd',  // Юзернэйм текущего пользователя (из Telegram)
-      partnerUsername: '',         // Юзернэйм партнёра (вводится пользователем)
-      errorMessage: '',            // Сообщение об ошибке
+      username: '@Vitaliy_Drozd',  // Current user's username (from Telegram)
+      partnerUsername: '',         // Partner's username (user input)
+      errorMessage: '',            // Error message
+      languages: {
+        en: 'EN',
+        ru: 'RU',
+      },
     };
   },
+  computed: {
+    currentLanguage() {
+      return this.$i18n.locale.toUpperCase();
+    },
+    alternateLanguage() {
+      return this.$i18n.locale === 'en' ? this.languages.ru : this.languages.en;
+    },
+  },
   mounted() {
-    // Извлекаем данные о текущем пользователе через Telegram API при загрузке страницы
+    // Extract user data via Telegram API on page load
     this.extractTelegramData();
     
-    // Add global click listener to detect clicks outside the input
+    // Add global click listeners to detect clicks outside the language switcher
     document.addEventListener('click', this.handleClickOutside);
-    // For mobile devices, it's good to also listen to touchstart
     document.addEventListener('touchstart', this.handleClickOutside);
   },
-  beforeDestroy() {
+  beforeUnmount() { // Updated for Vue 3
     // Remove the event listeners when the component is destroyed
     document.removeEventListener('click', this.handleClickOutside);
     document.removeEventListener('touchstart', this.handleClickOutside);
@@ -50,9 +69,9 @@ export default {
         const user = initDataUnsafe.user;
 
         this.username = user ? `@${user.username}` : '@Vitaliy2';
-        console.log('Текущий юзернэйм: ' + this.username);
+        console.log('Current username: ' + this.username);
       } else {
-        console.log('Telegram WebApp object не доступен');
+        console.log('Telegram WebApp object not available');
       }
     },
     
@@ -63,12 +82,12 @@ export default {
       }
 
       if (!this.partnerUsername.startsWith('@')) {
-        this.errorMessage = 'Юзернэйм должен начинаться с @.';
+        this.errorMessage = this.$t('errorUsernameStart');
         return;
       }
 
       if (!this.username) {
-        this.errorMessage = 'Ошибка: не удалось получить ваш юзернэйм.';
+        this.errorMessage = this.$t('errorUsernameFetch');
         return;
       }
 
@@ -76,94 +95,100 @@ export default {
         const response = await fetch('https://udaejtcmj5.execute-api.eu-west-2.amazonaws.com/main/gamecreation', {
           method: 'POST',
           body: JSON.stringify({
-            username: this.username,               // Юзернэйм текущего пользователя
-            partnerUsername: this.partnerUsername, // Юзернэйм партнёра
+            username: this.username,               // Current user's username
+            partnerUsername: this.partnerUsername, // Partner's username
           }),
           headers: {
             'Content-Type': 'application/json',
           },
         });
 
-        const data = await response.json();  // Получаем ответ от Lambda
+        const data = await response.json();  // Get response from Lambda
 
         if (response.ok) {
           const { gameId, status } = data;
 
-          // Сохраняем gameId и юзернэйм партнёра в localStorage
+          // Save gameId and partner's username in localStorage
           localStorage.setItem('gameId', gameId);
           localStorage.setItem('username', this.username);
           localStorage.setItem('partnerUsername', this.partnerUsername);
 
-          // Перенаправляем пользователя в зависимости от статуса
-          if (status === 'waiting') {
-            this.$router.push(`/test?gameId=${gameId}`);
-          } else if (status === 'ready') {
-            this.$router.push(`/test?gameId=${gameId}`);
-          }
+          // Redirect user based on status
+          this.$router.push(`/test?gameId=${gameId}`);
         } else {
-          this.errorMessage = 'Ошибка при начале игры. Попробуйте снова.';
+          this.errorMessage = this.$t('errorGameStart');
         }
       } catch (error) {
-        this.errorMessage = 'Произошла ошибка: ' + error.message;
+        this.errorMessage = this.$t('errorGeneral', { error: error.message });
       }
     },
     
     handleClickOutside(event) {
-      // Check if the click was outside the input field
-      const input = this.$refs.partnerInput;
-      if (input && !input.contains(event.target)) {
-        input.blur(); // Remove focus to hide the keyboard
-      }
+      // Optional: Implement if needed for other elements
     },
     
-    handleGlobalClick(event) {
-      // Optional: Additional logic if needed when clicking on the background
+    toggleLanguage() {
+      const newLang = this.$i18n.locale === 'en' ? 'ru' : 'en';
+      this.$i18n.locale = newLang;
+      localStorage.setItem('locale', newLang);
     },
   },
 };
 </script>
 
 <style scoped>
-/* Ваши стили здесь */
-.error {
-  color: red;
-  margin-top: 10px;
-}
-</style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&family=Noto+Serif:wght@600&display=swap');
 
-
-
-
-
-<style scoped>
-
-@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&family=Roboto:wght@400&display=swap');
-
+/* General Styles */
 .app-background {
   background-size: cover;
   background-position: center;
   height: 100vh;
+  position: relative; /* To position the language switcher */
   display: flex;
-  justify-content: center;  /* Горизонтальное выравнивание по центру */
-  align-items: center;      /* Вертикальное выравнивание по центру */
-  padding: 0 16px;          /* Отступы по бокам */
+  justify-content: center;  /* Horizontally center */
+  align-items: center;      /* Vertically center */
+  padding: 0 16px;          /* Side padding */
 }
 
-/* Основной экран */
+/* Language Switcher Container */
+.language-switcher-container {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1000; /* Ensure it stays on top */
+}
+
+/* Language Switcher Button */
+.language-switcher {
+  background: #355d87;
+  border: none;
+  cursor: pointer;
+  font-size: 24px;
+  color: #c76d88;
+  font-family: 'Noto Sans', sans-serif;
+  transition: color 0.3s ease;
+}
+
+.language-switcher:hover {
+  color: #a377b0;
+}
+
+/* Start Screen */
 .start-screen {
-  background: rgba(255, 255, 255, 0.9); /* Прозрачный белый блок */
+  background: rgba(255, 255, 255, 0.9); /* Transparent white block */
   border-radius: 15px;
   padding: 40px;
   text-align: center;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
   width: 100%;
   max-width: 420px;
   box-sizing: border-box;
 }
 
-/* Заголовок */
+/* Heading */
 h1 {
-  font-family: 'Quicksand', sans-serif;
+  font-family: 'Noto Serif', serif;
   font-weight: 600;
   color: #4a4a4a;
   margin-bottom: 24px;
@@ -171,16 +196,16 @@ h1 {
   letter-spacing: 1px;
 }
 
-/* Описание */
+/* Description */
 p {
-  font-family: 'Roboto', sans-serif;
+  font-family: 'Noto Sans', sans-serif;
   font-size: 16px;
   color: #666;
   margin-bottom: 24px;
   line-height: 1.6;
 }
 
-/* Поле для ввода */
+/* Input Field */
 input {
   padding: 14px;
   font-size: 16px;
@@ -190,40 +215,39 @@ input {
   box-sizing: border-box;
   margin-bottom: 24px;
   transition: border-color 0.3s ease;
-  font-family: 'Roboto', sans-serif;
+  font-family: 'Noto Sans', sans-serif;
 }
 
-/* Изменение цвета поля при фокусе */
+/* Input Focus */
 input:focus {
   border-color: #b48ec1;
   outline: none;
 }
 
-/* Кнопка начала игры */
+/* Start Game Button */
 button {
-  background-color: #b48ec1;
+  background-color: #355d87;
   color: white;
   padding: 14px 28px;
   font-size: 18px;
   border: none;
   border-radius: 12px;
   cursor: pointer;
-  font-family: 'Quicksand', sans-serif;
+  font-family: 'Noto Sans', sans-serif;
   transition: background-color 0.3s ease;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.15);
 }
 
-/* Кнопка при наведении */
-button:hover {
+/* Start Game Button Hover */
+/* button:hover {
   background-color: #a377b0;
-}
+} */
 
-/* Сообщение об ошибке */
+/* Error Message */
 .error {
   color: #e74c3c;
-  font-size: 14px;
-  margin-top: -12px;
-  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  margin-top: 10px;
+  font-family: 'Noto Sans', sans-serif;
 }
-
 </style>

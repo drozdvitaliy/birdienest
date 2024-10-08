@@ -41,13 +41,15 @@
 
       <!-- Action Display -->
       <div v-else-if="showAction" class="quiz-container">
-        <!-- Action Label -->
-        <div class="action-header">
-          <h3 class="action-label">{{ $t('countdown.actionLabel') }}</h3>
+        <div class="quiz-content">
+          <!-- Action Label -->
+          <div class="action-header">
+            <h3 class="action-label">{{ $t('countdown.actionLabel') }}</h3>
+          </div>
+          
+          <!-- Action Content -->
+          <h2 class="quiz-question">{{ currentAction.action }}</h2>
         </div>
-        
-        <!-- Action Content -->
-        <h2 class="quiz-question">{{ currentAction.action }}</h2>
         
         <!-- Next Question Button -->
         <button 
@@ -59,6 +61,7 @@
           {{ $t('countdown.nextButton') }}
         </button>
       </div>
+
 
       <!-- Waiting for Opponent to Press "Next" -->
       <div v-else-if="waitingForOpponentNext" class="waiting-container">
@@ -524,6 +527,7 @@ export default {
 .quiz-content {
   overflow-y: auto;
   max-height: 70vh; /* Adjust to leave space for the "Next" button */
+  scroll-behavior: smooth;
 }
 
 .quiz-question {
@@ -703,4 +707,18 @@ export default {
     padding: 10px 20px;
   }
 }
+
+.quiz-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.quiz-content::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.quiz-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 </style>

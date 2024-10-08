@@ -164,7 +164,7 @@ export default {
   background: #355d87;
   border: none;
   cursor: pointer;
-  font-size: 24px;
+  font-size: 18px;
   color: #c76d88;
   font-family: 'Noto Sans', sans-serif;
   transition: color 0.3s ease;

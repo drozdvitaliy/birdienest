@@ -3,7 +3,7 @@ import { createI18n } from 'vue-i18n';
 
 const messages = {
   en: {
-    title: "🌸 Let's Get to Know Each Other Better!",
+    title: "🌸 Explore New Facets of Each Other",
     description: "👥 Enter your partner's username to begin your journey together:",
     inputPlaceholder: "@username",
     startGame: "Start Game 💖",
@@ -22,7 +22,7 @@ const messages = {
     },
   },
   ru: {
-    title: "🌸 Давайте лучше узнаем друг друга!",
+    title: "🌸 Откройте новые грани друг друга!",
     description: "👥 Введите юзернэйм вашего партнёра, чтобы начать ваше совместное путешествие:",
     inputPlaceholder: "@username",
     startGame: "Начать игру 💖",

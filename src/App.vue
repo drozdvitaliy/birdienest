@@ -1,7 +1,6 @@
 <template>
   <div id="app">
-    <!-- Language Switcher -->
-    <LanguageSwitcher />
+
 
     <!-- Router View -->
     <router-view></router-view>
@@ -13,9 +12,9 @@ import LanguageSwitcher from './views/LanguageSwitcher.vue';
 
 export default {
   name: 'App',
-  components: {
-    LanguageSwitcher,
-  },
+  // components: {
+  //   LanguageSwitcher,
+  // },
 };
 </script>
 

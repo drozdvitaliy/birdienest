@@ -1,5 +1,7 @@
 <template>
   <div class="app-background" @click="handleGlobalClick">
+    <!-- Language Switcher -->
+    <LanguageSwitcher />
     <!-- Start Screen -->
     <div class="start-screen" @click.stop>
       <h1>{{ $t('title') }}</h1>
@@ -22,6 +24,8 @@
 </template>
 
 <script>
+import LanguageSwitcher from './LanguageSwitcher.vue';
+
 export default {
   data() {
     return {
@@ -29,6 +33,9 @@ export default {
       partnerUsername: '',         // Partner's username (user input)
       errorMessage: '',            // Error message
     };
+  },
+  components: {
+    LanguageSwitcher,
   },
   mounted() {
     // Extract user data via Telegram API on page load

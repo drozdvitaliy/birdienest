@@ -11,12 +11,14 @@
         <h2 class="waiting-message">{{ $t('countdown.waitingForPartner') }}</h2>
       </div>
 
-
       <!-- Quiz Display -->
       <div v-else-if="showQuiz" class="quiz-container">
         <div class="quiz-content">
-          <h2 class="quiz-question">{{ currentQuestion[dataLocale].question }}</h2>
-          <ul class="quiz-options">
+          <!-- Question -->
+          <h2 class="quiz-question" v-if="currentQuestion[dataLocale]">
+            {{ currentQuestion[dataLocale].question }}
+          </h2>
+          <ul class="quiz-options" v-if="currentQuestion[dataLocale] && currentQuestion[dataLocale].options">
             <li v-for="(option, index) in currentQuestion[dataLocale].options" :key="index">
               <button 
                 @click="selectOption(index)" 
@@ -28,6 +30,8 @@
               </button>
             </li>
           </ul>
+          <!-- Error Message if No Options -->
+          <p v-else class="error-message">No options available.</p>
         </div>
         <!-- Next Question Button -->
         <button 
@@ -39,7 +43,6 @@
           {{ $t('countdown.nextButton') }}
         </button>
       </div>
-
 
       <!-- Action Display -->
       <div v-else-if="showAction" class="quiz-container">
@@ -123,6 +126,7 @@ export default {
       opponentHasPressedNext: false, // Track if opponent pressed "Next"
       lambdaInvoked: false, // Prevent multiple Lambda invocations
       waitingForOpponentNext: false, // Track if waiting for opponent after pressing "Next"
+      matchingresponses: false, // Added missing property
     };
   },
   computed: {
@@ -237,7 +241,7 @@ export default {
     handleWebSocketMessage(message) {
       console.log('Received message:', message); // Add a general log for all messages
 
-      switch (message.action) { // Changed from message.action to message.type
+      switch (message.action) { // Changed from message.type to message.action
         case 'session_start':
           this.sessionId = message.data.gameId;
           console.log('Session started with gameId:', this.sessionId);
@@ -252,6 +256,7 @@ export default {
         case 'question':
           if (message.data && typeof message.data === 'object') {
             const { ru, en } = message.data; // Destructure ru and en
+            console.log('Received question data:', message.data); // Added log
             if (ru && en && ru.question && ru.options && en.question && en.options) {
               this.currentQuestion = {
                 ru: {
@@ -275,7 +280,7 @@ export default {
               this.opponentHasPressedNext = false;
               this.lambdaInvoked = false;
               this.waitingForOpponentNext = false;
-              console.log('Received question:', this.currentQuestion);
+              console.log('Processed currentQuestion:', this.currentQuestion);
             } else {
               console.warn('Invalid question data format:', message.data);
             }
@@ -311,8 +316,10 @@ export default {
             console.warn('Invalid action message format:', message);
           }
           break;
+
         case 'opponent_answer':
           const opponentAnswerIndex = message.data.answer;
+          console.log(`Received opponent answer index: ${opponentAnswerIndex}`);
 
           // Validate that the received index is a number within the options range
           if (
@@ -332,6 +339,7 @@ export default {
             console.warn('Opponent selected an invalid option index:', opponentAnswerIndex);
           }
           break;
+
         case 'opponent_next_pressed':
           // Handle opponent pressing "Next" if necessary
           // Uncomment and implement if needed
@@ -372,7 +380,7 @@ export default {
           this.resetQuiz();
           break;
         default:
-          console.warn('Unknown type:', message.type);
+          console.warn('Unknown action:', message.action);
       }
     },
     requestQuestion() {
@@ -390,10 +398,22 @@ export default {
       }
     },
     selectOption(index) {
+      console.log(`selectOption called with index: ${index}`); // Debug log
       if (this.selectedOptionIndex !== null) return; // Prevent multiple selections
 
       this.selectedOptionIndex = index; // Track the selected option
       console.log(`Selected option index: ${index}`);
+
+      // Validate that the index is within the options range
+      if (
+        !this.currentQuestion[this.dataLocale] ||
+        !Array.isArray(this.currentQuestion[this.dataLocale].options) ||
+        index < 0 ||
+        index >= this.currentQuestion[this.dataLocale].options.length
+      ) {
+        console.error('Invalid option index selected:', index);
+        return;
+      }
 
       // Send the selected option index to the backend
       const payload = {
@@ -404,7 +424,7 @@ export default {
         },
       };
       this.websocket.send(JSON.stringify(payload));
-      console.log('Sent answer index to backend.');
+      console.log('Sent answer index to backend:', payload);
 
       // Check if opponent has already answered
       if (this.opponentAnswerIndex !== null) {
@@ -429,6 +449,7 @@ export default {
       this.opponentHasPressedNext = false;
       this.lambdaInvoked = false;
       this.waitingForOpponentNext = false;
+      this.matchingresponses = false; // Reset matchingresponses
       // Optionally, reset the countdown or navigate away
       this.startCountdown();
       this.initWebSocket();
@@ -481,7 +502,7 @@ export default {
 
       // Send data to the backend via WebSocket
       this.websocket.send(JSON.stringify(payload));
-      console.log('Sent user_next_pressed payload to backend.');
+      console.log('Sent user_next_pressed payload to backend:', payload);
     },
 
     hideQuizAndWait() {
@@ -492,7 +513,6 @@ export default {
   },
 };
 </script>
-
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Quicksand:wght@400;600&display=swap');

@@ -56,23 +56,19 @@ export default {
         const initDataUnsafe = window.Telegram.WebApp.initDataUnsafe;
         const user = initDataUnsafe.user;
 
+        // Extract the username
         this.username = user ? `@${user.username}` : '@Vitaliy2';
         console.log('Current username: ' + this.username);
 
-        // Retrieve the user's language code from Telegram
-        const lang = window.Telegram.WebApp.language_code;
-        console.log('User language code: ' + lang);
+        // Extract the language code
+        const supportedLanguages = ['en', 'ru']; // List of supported language codes
+        const userLanguageCode = user && user.language_code ? user.language_code : 'en';
 
-        // Set the app's language based on the Telegram language code
-        if (lang && lang.startsWith('ru')) {
-          this.setLanguage('ru');
-        } else {
-          this.setLanguage('en');
-        }
+        // Check if the user's language is supported; if not, default to English
+        this.$i18n.locale = supportedLanguages.includes(userLanguageCode) ? userLanguageCode : 'en';
+        console.log('Current language: ' + this.$i18n.locale);
       } else {
         console.log('Telegram WebApp object not available');
-        // Optionally set a default language if Telegram WebApp is not available
-        this.setLanguage('en');
       }
     },
     

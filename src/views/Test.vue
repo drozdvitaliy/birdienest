@@ -11,12 +11,13 @@
         <h2 class="waiting-message">{{ $t('countdown.waitingForPartner') }}</h2>
       </div>
 
+
       <!-- Quiz Display -->
       <div v-else-if="showQuiz" class="quiz-container">
         <div class="quiz-content">
-          <h2 class="quiz-question">{{ currentQuestion.question }}</h2>
+          <h2 class="quiz-question">{{ currentQuestion[dataLocale].question }}</h2>
           <ul class="quiz-options">
-            <li v-for="(option, index) in currentQuestion.options" :key="index">
+            <li v-for="(option, index) in currentQuestion[dataLocale].options" :key="index">
               <button 
                 @click="selectOption(index)" 
                 class="quiz-button"
@@ -39,6 +40,7 @@
         </button>
       </div>
 
+
       <!-- Action Display -->
       <div v-else-if="showAction" class="quiz-container">
         <div class="quiz-content">
@@ -48,7 +50,7 @@
           </div>
           
           <!-- Action Content -->
-          <h2 class="quiz-question">{{ currentAction.action }}</h2>
+          <h2 class="quiz-question">{{ currentAction[dataLocale] }}</h2>
         </div>
         
         <!-- Next Question Button -->
@@ -61,7 +63,6 @@
           {{ $t('countdown.nextButton') }}
         </button>
       </div>
-
 
       <!-- Waiting for Opponent to Press "Next" -->
       <div v-else-if="waitingForOpponentNext" class="waiting-container">
@@ -124,6 +125,14 @@ export default {
       waitingForOpponentNext: false, // Track if waiting for opponent after pressing "Next"
     };
   },
+  computed: {
+    // Determine the current language ('ru' or 'en') based on Vue I18n's locale
+    dataLocale() {
+      const locale = this.$i18n.locale.startsWith('ru') ? 'ru' : 'en';
+      console.log('Current Locale:', locale);
+      return locale;
+    }
+  },
   mounted() {
     // Retrieve gameId and username from localStorage
     this.gameId = localStorage.getItem('gameId');
@@ -166,7 +175,7 @@ export default {
         this.isReconnecting = false;
         this.reconnectAttempts = 0;
         // If the quiz is already showing, ensure the user rejoins
-        if (this.showQuiz) {
+        if (this.showQuiz || this.showAction) {
           this.joinGame();
         }
       };
@@ -228,7 +237,7 @@ export default {
     handleWebSocketMessage(message) {
       console.log('Received message:', message); // Add a general log for all messages
 
-      switch (message.action) {
+      switch (message.action) { // Changed from message.action to message.type
         case 'session_start':
           this.sessionId = message.data.gameId;
           console.log('Session started with gameId:', this.sessionId);
@@ -241,62 +250,82 @@ export default {
           console.log('Waiting for partner to join...');
           break;
         case 'question':
-          this.currentQuestion = {
-            question: message.data.question,
-            options: message.data.options,
-          };
-          this.showQuiz = true;
-          this.showAction = false;
-          this.selectedOptionIndex = null;
-          this.opponentAnswerIndex = null; // Reset opponent's answer for new question
-          this.isConfettiLaunched = false; // Reset confetti launch flag
-          this.showNextButton = false; // Reset next button visibility
-          this.nextButtonPressed = false; // Reset button pressed flag
-          this.startTime = Date.now(); // Record start time
-          this.userHasPressedNext = false;
-          this.opponentHasPressedNext = false;
-          this.lambdaInvoked = false;
-          this.waitingForOpponentNext = false;
-          console.log('Received question:', this.currentQuestion);
-          break;
-        case 'action':
-          // **Updated Code Starts Here**
-          // Since message.data is a string ("Текст действия"), assign it directly
-          this.currentAction = {
-            action: message.data, // Changed from message.data.action to message.data
-          };
-          // **Updated Code Ends Here**
-
-          this.showQuiz = false;
-          this.showAction = true;
-          this.selectedOptionIndex = null;
-          this.opponentAnswerIndex = null; // Reset opponent's answer for new action
-          this.isConfettiLaunched = false; // Reset confetti launch flag
-          this.showNextButton = true; // Show the "Next" button
-          this.nextButtonPressed = false; // Reset button pressed flag
-          this.startTime = Date.now(); // Record start time
-          this.userHasPressedNext = false;
-          this.opponentHasPressedNext = false;
-          this.waitingForOpponentNext = false;
-          console.log('Received action:', this.currentAction.action);
-          break;
-
-
-        case 'opponent_answer':
-          const opponentAnswer = message.data.answer;
-          const opponentIndex = this.currentQuestion.options.indexOf(opponentAnswer);
-          if (opponentIndex !== -1) {
-            this.opponentAnswerIndex = opponentIndex;
-            console.log(`Opponent selected option index: ${opponentIndex}`);
-            // Check if user has already answered
-            if (this.selectedOptionIndex !== null) {
-              this.showNextButton = true;
+          if (message.data && typeof message.data === 'object') {
+            const { ru, en } = message.data; // Destructure ru and en
+            if (ru && en && ru.question && ru.options && en.question && en.options) {
+              this.currentQuestion = {
+                ru: {
+                  question: ru.question,
+                  options: ru.options,
+                },
+                en: {
+                  question: en.question,
+                  options: en.options,
+                },
+              };
+              this.showQuiz = true;
+              this.showAction = false;
+              this.selectedOptionIndex = null;
+              this.opponentAnswerIndex = null;
+              this.isConfettiLaunched = false;
+              this.showNextButton = false;
+              this.nextButtonPressed = false;
+              this.startTime = Date.now();
+              this.userHasPressedNext = false;
+              this.opponentHasPressedNext = false;
+              this.lambdaInvoked = false;
+              this.waitingForOpponentNext = false;
+              console.log('Received question:', this.currentQuestion);
+            } else {
+              console.warn('Invalid question data format:', message.data);
             }
-            this.checkForMatchingAnswers();
-          } else {
-            console.warn('Opponent selected an invalid option.');
           }
           break;
+
+        case 'action':
+          // Handle the new action message structure
+          if (message.data && typeof message.data === 'object') {
+            const { ru, en } = message.data;
+            if (typeof ru === 'string' && typeof en === 'string') {
+              this.currentAction = {
+                ru: ru,
+                en: en,
+              };
+              this.showQuiz = false;
+              this.showAction = true;
+              this.selectedOptionIndex = null;
+              this.opponentAnswerIndex = null; // Reset opponent's answer for new action
+              this.isConfettiLaunched = false; // Reset confetti launch flag
+              this.showNextButton = true; // Show the "Next" button
+              this.nextButtonPressed = false; // Reset button pressed flag
+              this.startTime = Date.now(); // Record start time
+              this.userHasPressedNext = false;
+              this.opponentHasPressedNext = false;
+              this.waitingForOpponentNext = false;
+              console.log('Received action:', this.currentAction);
+            } else {
+              console.warn('Invalid data format for action:', message.data);
+              // Optionally, handle differently
+            }
+          } else {
+            console.warn('Invalid action message format:', message);
+          }
+          break;
+          case 'opponent_answer':
+            const opponentAnswer = message.data.answer;
+            const opponentIndex = this.currentQuestion[this.dataLocale].options.indexOf(opponentAnswer); // Correct access
+            if (opponentIndex !== -1) {
+              this.opponentAnswerIndex = opponentIndex;
+              console.log(`Opponent selected option index: ${opponentIndex}`);
+              // Check if user has already answered
+              if (this.selectedOptionIndex !== null) {
+                this.showNextButton = true;
+              }
+              this.checkForMatchingAnswers();
+            } else {
+              console.warn('Opponent selected an invalid option.');
+            }
+            break;
         case 'opponent_next_pressed':
           // Handle opponent pressing "Next" if necessary
           // Uncomment and implement if needed
@@ -337,7 +366,7 @@ export default {
           this.resetQuiz();
           break;
         default:
-          console.warn('Unknown action:', message.action);
+          console.warn('Unknown type:', message.type);
       }
     },
     requestQuestion() {
@@ -358,7 +387,7 @@ export default {
       if (this.selectedOptionIndex !== null) return; // Prevent multiple selections
 
       this.selectedOptionIndex = index; // Track the selected option
-      const selectedOption = this.currentQuestion.options[index];
+      const selectedOption = this.currentQuestion[this.dataLocale].options[index]; // Correct access
       console.log(`Selected option: ${selectedOption}`);
 
       // Send the selected option to the backend
@@ -458,6 +487,7 @@ export default {
   },
 };
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Quicksand:wght@400;600&display=swap');

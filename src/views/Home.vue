@@ -58,8 +58,30 @@ export default {
 
         this.username = user ? `@${user.username}` : '@Vitaliy2';
         console.log('Current username: ' + this.username);
+
+        // Retrieve the user's language code from Telegram
+        const lang = window.Telegram.WebApp.language_code;
+        console.log('User language code: ' + lang);
+
+        // Set the app's language based on the Telegram language code
+        if (lang && lang.startsWith('ru')) {
+          this.setLanguage('ru');
+        } else {
+          this.setLanguage('en');
+        }
       } else {
         console.log('Telegram WebApp object not available');
+        // Optionally set a default language if Telegram WebApp is not available
+        this.setLanguage('en');
+      }
+    },
+    
+    setLanguage(locale) {
+      if (this.$i18n) {
+        this.$i18n.locale = locale;
+        console.log(`App language set to: ${locale}`);
+      } else {
+        console.warn('vue-i18n is not configured.');
       }
     },
     

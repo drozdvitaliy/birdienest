@@ -311,21 +311,27 @@ export default {
             console.warn('Invalid action message format:', message);
           }
           break;
-          case 'opponent_answer':
-            const opponentAnswer = message.data.answer;
-            const opponentIndex = this.currentQuestion[this.dataLocale].options.indexOf(opponentAnswer); // Correct access
-            if (opponentIndex !== -1) {
-              this.opponentAnswerIndex = opponentIndex;
-              console.log(`Opponent selected option index: ${opponentIndex}`);
-              // Check if user has already answered
-              if (this.selectedOptionIndex !== null) {
-                this.showNextButton = true;
-              }
-              this.checkForMatchingAnswers();
-            } else {
-              console.warn('Opponent selected an invalid option.');
+        case 'opponent_answer':
+          const opponentAnswerIndex = message.data.answer;
+
+          // Validate that the received index is a number within the options range
+          if (
+            typeof opponentAnswerIndex === 'number' &&
+            opponentAnswerIndex >= 0 &&
+            opponentAnswerIndex < this.currentQuestion[this.dataLocale].options.length
+          ) {
+            this.opponentAnswerIndex = opponentAnswerIndex;
+            console.log(`Opponent selected option index: ${opponentAnswerIndex}`);
+
+            // Check if user has already answered
+            if (this.selectedOptionIndex !== null) {
+              this.showNextButton = true;
             }
-            break;
+            this.checkForMatchingAnswers();
+          } else {
+            console.warn('Opponent selected an invalid option index:', opponentAnswerIndex);
+          }
+          break;
         case 'opponent_next_pressed':
           // Handle opponent pressing "Next" if necessary
           // Uncomment and implement if needed
@@ -387,19 +393,18 @@ export default {
       if (this.selectedOptionIndex !== null) return; // Prevent multiple selections
 
       this.selectedOptionIndex = index; // Track the selected option
-      const selectedOption = this.currentQuestion[this.dataLocale].options[index]; // Correct access
-      console.log(`Selected option: ${selectedOption}`);
+      console.log(`Selected option index: ${index}`);
 
-      // Send the selected option to the backend
+      // Send the selected option index to the backend
       const payload = {
         action: 'receive_answer',
         data: {
           gameId: this.gameId,
-          answer: selectedOption,
+          answer: index, // Send the index instead of the text
         },
       };
       this.websocket.send(JSON.stringify(payload));
-      console.log('Sent answer to backend.');
+      console.log('Sent answer index to backend.');
 
       // Check if opponent has already answered
       if (this.opponentAnswerIndex !== null) {

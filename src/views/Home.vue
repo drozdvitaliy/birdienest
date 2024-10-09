@@ -1,12 +1,5 @@
 <template>
   <div class="app-background" @click="handleGlobalClick">
-    <!-- Language Switcher Button -->
-    <div class="language-switcher-container" @click.stop>
-      <button class="language-switcher" @click="toggleLanguage">
-        {{ alternateLanguage }}
-      </button>
-    </div>
-
     <!-- Start Screen -->
     <div class="start-screen" @click.stop>
       <h1>{{ $t('title') }}</h1>
@@ -35,19 +28,7 @@ export default {
       username: '@Vitaliy_Drozd',  // Current user's username (from Telegram)
       partnerUsername: '',         // Partner's username (user input)
       errorMessage: '',            // Error message
-      languages: {
-        en: 'EN',
-        ru: 'RU',
-      },
     };
-  },
-  computed: {
-    currentLanguage() {
-      return this.$i18n.locale.toUpperCase();
-    },
-    alternateLanguage() {
-      return this.$i18n.locale === 'en' ? this.languages.ru : this.languages.en;
-    },
   },
   mounted() {
     // Extract user data via Telegram API on page load
@@ -126,12 +107,6 @@ export default {
     handleClickOutside(event) {
       // Optional: Implement if needed for other elements
     },
-    
-    toggleLanguage() {
-      const newLang = this.$i18n.locale === 'en' ? 'ru' : 'en';
-      this.$i18n.locale = newLang;
-      localStorage.setItem('locale', newLang);
-    },
   },
 };
 </script>
@@ -149,29 +124,6 @@ export default {
   justify-content: center;  /* Horizontally center */
   align-items: center;      /* Vertically center */
   padding: 0 16px;          /* Side padding */
-}
-
-/* Language Switcher Container */
-.language-switcher-container {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 1000; /* Ensure it stays on top */
-}
-
-/* Language Switcher Button */
-.language-switcher {
-  background: #355d87;
-  border: none;
-  cursor: pointer;
-  font-size: 18px;
-  color: #c76d88;
-  font-family: 'Noto Sans', sans-serif;
-  transition: color 0.3s ease;
-}
-
-.language-switcher:hover {
-  color: #a377b0;
 }
 
 /* Start Screen */
@@ -237,11 +189,6 @@ button {
   transition: background-color 0.3s ease;
   box-shadow: 0 8px 16px rgba(0,0,0,0.15);
 }
-
-/* Start Game Button Hover */
-/* button:hover {
-  background-color: #a377b0;
-} */
 
 /* Error Message */
 .error {

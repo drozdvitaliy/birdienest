@@ -1,16 +1,21 @@
 <template>
   <div id="app">
-    <!-- <nav>
-      <router-link to="/">Home</router-link>
-      <router-link to="/test">Test</router-link>
-    </nav> -->
+    <!-- Language Switcher -->
+    <LanguageSwitcher />
+
+    <!-- Router View -->
     <router-view></router-view>
   </div>
 </template>
 
 <script>
+import LanguageSwitcher from './views/LanguageSwitcher.vue';
+
 export default {
   name: 'App',
+  components: {
+    LanguageSwitcher,
+  },
 };
 </script>
 
@@ -32,12 +37,14 @@ html, body, #app {
   width: 100%;   /* Ensure the app container takes full width */
   margin: 0;
   padding: 0;
+  position: relative; /* To position the language switcher */
 }
 
 /* Additional styles for layout */
 nav {
   margin-bottom: 20px;
 }
+
 router-link {
   margin-right: 10px;
   color: white;

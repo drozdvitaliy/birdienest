@@ -13,6 +13,7 @@
         type="text"
         v-model="partnerUsername"
         placeholder="@username"
+        @focus="onInputFocus"
         @keyup.enter="startGame" 
       />
       
@@ -45,7 +46,7 @@ export default {
     document.addEventListener('click', this.handleClickOutside);
     document.addEventListener('touchstart', this.handleClickOutside);
   },
-  beforeUnmount() { // Updated for Vue 3
+  beforeUnmount() {
     // Remove the event listeners when the component is destroyed
     document.removeEventListener('click', this.handleClickOutside);
     document.removeEventListener('touchstart', this.handleClickOutside);
@@ -132,6 +133,12 @@ export default {
     handleClickOutside(event) {
       // Optional: Implement if needed for other elements
     },
+
+    onInputFocus() {
+      if (this.$refs.partnerInput) {
+        this.$refs.partnerInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    },
   },
 };
 </script>
@@ -143,17 +150,16 @@ export default {
 .app-background {
   background-size: cover;
   background-position: center;
-  height: 100vh;
+  min-height: 100vh;
   position: relative; /* To position the language switcher */
-  display: flex;
-  justify-content: center;  /* Horizontally center */
-  align-items: center;      /* Vertically center */
   padding: 0 16px;          /* Side padding */
+  overflow-y: auto;         /* Allow vertical scrolling */
 }
 
 /* Start Screen */
 .start-screen {
-  background: rgba(255, 255, 255, 0.9); /* Transparent white block */
+  margin: 100px auto 0 auto; /* Center horizontally with top margin */
+  background: rgba(255, 255, 255, 0.9);
   border-radius: 15px;
   padding: 40px;
   text-align: center;

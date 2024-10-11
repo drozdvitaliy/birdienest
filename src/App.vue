@@ -26,9 +26,10 @@ html, body, #app {
   height: 100%;
 }
 
+
 /* This will apply the background to the whole app */
 #app {
-  background-image: url('./assets/background.jpg');  /* Keep this line to check the image */
+  background-image: url('./assets/background.png');  /* Keep this line to check the image */
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

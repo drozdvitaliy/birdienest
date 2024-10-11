@@ -1,13 +1,8 @@
 <template>
   <div class="countdown-background">
     <div class="countdown-container">
-      <!-- Countdown Display -->
-      <div v-if="count > 0" class="countdown-number">
-        {{ count }}
-      </div>
-
       <!-- Waiting for Opponent -->
-      <div v-else-if="waitingForOpponent" class="waiting-container">
+      <div v-if="waitingForOpponent" class="waiting-container">
         <h2 class="waiting-message">{{ $t('countdown.waitingForPartner') }}</h2>
       </div>
 
@@ -99,8 +94,6 @@ export default {
   },
   data() {
     return {
-      count: 5,
-      countdownInterval: null,
       showQuiz: false,
       showAction: false,
       waitingForOpponent: false,
@@ -148,28 +141,14 @@ export default {
       return;
     }
 
-    this.startCountdown();
     this.initWebSocket();
   },
   beforeUnmount() {
-    clearInterval(this.countdownInterval);
     if (this.websocket) {
       this.websocket.close();
     }
   },
   methods: {
-    startCountdown() {
-      this.countdownInterval = setInterval(() => {
-        if (this.count > 0) {
-          this.count--;
-        } else {
-          clearInterval(this.countdownInterval);
-          this.count = 0;
-          // After countdown, attempt to join the game
-          this.joinGame();
-        }
-      }, 1000);
-    },
     initWebSocket() {
       const wsUrl = 'wss://ayfcf5re9e.execute-api.eu-west-2.amazonaws.com/production/'; // Replace with your actual WebSocket URL
       this.websocket = new WebSocket(wsUrl);
@@ -178,10 +157,8 @@ export default {
         console.log('WebSocket connection established.');
         this.isReconnecting = false;
         this.reconnectAttempts = 0;
-        // If the quiz is already showing, ensure the user rejoins
-        if (this.showQuiz || this.showAction) {
-          this.joinGame();
-        }
+        // Join the game once the WebSocket is open
+        this.joinGame();
       };
 
       this.websocket.onmessage = (event) => {
@@ -241,12 +218,12 @@ export default {
     handleWebSocketMessage(message) {
       console.log('Received message:', message); // Add a general log for all messages
 
-      switch (message.action) { // Changed from message.type to message.action
+      switch (message.action) {
         case 'session_start':
           this.sessionId = message.data.gameId;
           console.log('Session started with gameId:', this.sessionId);
           this.waitingForOpponent = false;
-          // Optionally, request the first question immediately
+          // Request the first question
           this.requestQuestion();
           break;
         case 'waiting_for_opponent':
@@ -255,19 +232,26 @@ export default {
           break;
         case 'question':
           if (message.data && typeof message.data === 'object') {
-            const { ru, en } = message.data; // Destructure ru and en
-            console.log('Received question data:', message.data); // Added log
-            if (ru && en && ru.question && ru.options && en.question && en.options) {
+            const { ru, en } = message.data;
+            console.log('Received question data:', message.data);
+            
+            // Ensure ru and en are objects with question and options
+            const ruData = typeof ru === 'string' ? { question: ru, options: [] } : ru;
+            const enData = typeof en === 'string' ? { question: en, options: [] } : en;
+            
+            if (ruData.question && enData.question) {
               this.currentQuestion = {
                 ru: {
-                  question: ru.question,
-                  options: ru.options,
+                  question: ruData.question,
+                  options: ruData.options || [],
                 },
                 en: {
-                  question: en.question,
-                  options: en.options,
+                  question: enData.question,
+                  options: enData.options || [],
                 },
               };
+              
+              // Setup quiz display
               this.showQuiz = true;
               this.showAction = false;
               this.selectedOptionIndex = null;
@@ -280,11 +264,13 @@ export default {
               this.opponentHasPressedNext = false;
               this.lambdaInvoked = false;
               this.waitingForOpponentNext = false;
+              
               console.log('Processed currentQuestion:', this.currentQuestion);
             } else {
               console.warn('Invalid question data format:', message.data);
             }
           }
+
           break;
 
         case 'action':
@@ -310,7 +296,6 @@ export default {
               console.log('Received action:', this.currentAction);
             } else {
               console.warn('Invalid data format for action:', message.data);
-              // Optionally, handle differently
             }
           } else {
             console.warn('Invalid action message format:', message);
@@ -321,7 +306,7 @@ export default {
           const opponentAnswerIndex = message.data.answer;
           console.log(`Received opponent answer index: ${opponentAnswerIndex}`);
 
-          // Validate that the received index is a number within the options range
+          // Validate the received index
           if (
             typeof opponentAnswerIndex === 'number' &&
             opponentAnswerIndex >= 0 &&
@@ -340,16 +325,6 @@ export default {
           }
           break;
 
-        case 'opponent_next_pressed':
-          // Handle opponent pressing "Next" if necessary
-          // Uncomment and implement if needed
-          /*
-          this.opponentHasPressedNext = true;
-          console.log('Opponent has pressed "Next".');
-          this.hideQuizAndWait();
-          this.checkBothNextPressed();
-          */
-          break;
         case 'next_question_ready':
           // Extract the username from the message
           const receivedUsername = message.data.message;
@@ -357,7 +332,7 @@ export default {
 
           // Compare with the current user's username
           if (receivedUsername === this.username) {
-            // Execute the desired function
+            // Proceed to the next question
             this.requestQuestion();
             console.log('Usernames match. Proceeding to the next question.');
           } else {
@@ -368,7 +343,6 @@ export default {
           // Server sends updated connection level
           const updatedCL = message.data.connectionLevel;
           console.log(`Connection Level updated to: ${updatedCL}`);
-          // Optionally, update a display or state
           break;
         case 'error':
           console.error('Error from server:', message.data.message);
@@ -376,7 +350,7 @@ export default {
           break;
         case 'opponent_disconnected':
           alert('Your opponent has disconnected.');
-          // Optionally, reset the quiz state or redirect the user
+          // Reset the quiz state or redirect the user
           this.resetQuiz();
           break;
         default:
@@ -398,13 +372,13 @@ export default {
       }
     },
     selectOption(index) {
-      console.log(`selectOption called with index: ${index}`); // Debug log
+      console.log(`selectOption called with index: ${index}`);
       if (this.selectedOptionIndex !== null) return; // Prevent multiple selections
 
       this.selectedOptionIndex = index; // Track the selected option
       console.log(`Selected option index: ${index}`);
 
-      // Validate that the index is within the options range
+      // Validate the index
       if (
         !this.currentQuestion[this.dataLocale] ||
         !Array.isArray(this.currentQuestion[this.dataLocale].options) ||
@@ -433,9 +407,9 @@ export default {
     },
     resetQuiz() {
       this.showQuiz = false;
-      this.showAction = false; // Reset showAction as well
+      this.showAction = false;
       this.currentQuestion = {};
-      this.currentAction = {}; // Reset currentAction
+      this.currentAction = {};
       this.selectedOptionIndex = null;
       this.opponentAnswerIndex = null;
       this.waitingForOpponent = false;
@@ -449,10 +423,8 @@ export default {
       this.opponentHasPressedNext = false;
       this.lambdaInvoked = false;
       this.waitingForOpponentNext = false;
-      this.matchingresponses = false; // Reset matchingresponses
-      // Optionally, reset the countdown or navigate away
-      this.startCountdown();
-      this.initWebSocket();
+      this.matchingresponses = false;
+      // Optionally, navigate away or prompt the user to restart
     },
     getButtonClasses(index) {
       return {
@@ -465,8 +437,6 @@ export default {
       if (this.selectedOptionIndex === this.opponentAnswerIndex && this.selectedOptionIndex !== null) {
         // Both users selected the same option
         this.launchConfetti();
-        // Call Lambda function to log the match
-        // this.logMatchingAnswers();
         this.matchingresponses = true;
       }
     },
@@ -537,13 +507,6 @@ export default {
   /* Enable scrolling if content overflows */
   max-height: 100vh;
   overflow-y: auto;
-}
-
-.countdown-number {
-  font-family: 'Great Vibes', cursive;
-  font-size: 160px;
-  color: #ffffff;
-  animation: pulse 1s infinite;
 }
 
 .waiting-container {
@@ -711,21 +674,6 @@ export default {
   text-align: center;
 }
 
-@keyframes pulse {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  70% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-}
-
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -748,9 +696,6 @@ export default {
 
 /* Responsive adjustments */
 @media (max-width: 600px) {
-  .countdown-number {
-    font-size: 120px;
-  }
   .countdown-message p {
     font-size: 18px;
   }
@@ -775,5 +720,4 @@ export default {
 .quiz-content::-webkit-scrollbar-track {
   background: transparent;
 }
-
 </style>
